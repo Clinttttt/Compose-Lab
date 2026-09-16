@@ -109,6 +109,10 @@
   cursor: pointer;
 }
 
+.line__button--static {
+  cursor: default;
+}
+
 .line__number {
   width: 24px;
   flex: none;

@@ -18,7 +18,9 @@
   /* Foreground */
   --text: #e4e7ea;
   --text-muted: #98a1ac;
-  --text-faint: #6b747f;
+  /* Light enough to clear 4.5:1 against the panel surface: this carries hints and labels at 11px,
+     which is exactly the text that must not be borderline. */
+  --text-faint: #8b939e;
 
   /* Semantic — state only */
   --success: #5a9e78;

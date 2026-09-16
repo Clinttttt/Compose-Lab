@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Deliberately small: formatting, build, and tests for each half, and nothing else. No coverage
+# gates, no publishing, no matrix — those cost maintenance and this project does not need them yet.
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          # global.json pins the SDK and opts `dotnet test` into the Microsoft.Testing.Platform runner.
+          global-json-file: src/backend/global.json
+
+      - run: dotnet restore ComposeLab.slnx
+
+      - name: format
+        run: dotnet format ComposeLab.slnx --verify-no-changes --no-restore
+
+      - name: build
+        run: dotnet build ComposeLab.slnx --no-restore
+
+      # Runs against a real PostgreSQL through Testcontainers, using the Docker daemon the runner
+      # already provides. No substitute provider: jsonb round-tripping, Npgsql serialisation, and
+      # migrations applying to an empty database are the behaviour worth testing.
+      - name: test
+        run: dotnet test --solution ComposeLab.slnx --no-build
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: format
+        run: npm run format:check
+
+      - name: test
+        run: npm test
+
+      - name: build
+        run: npm run build

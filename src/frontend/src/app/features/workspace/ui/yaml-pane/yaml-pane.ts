@@ -6,6 +6,8 @@ interface YamlLine {
   readonly number: number;
   readonly text: string;
   readonly highlighted: boolean;
+  /** True when some element produced this line, so selecting it means something. */
+  readonly selectable: boolean;
 }
 
 /**
@@ -38,9 +40,20 @@ export class YamlPane {
   protected readonly lines = computed<readonly YamlLine[]>(() => {
     const yaml = this.store.generatedYaml();
     const highlighted = new Set(this.store.highlightedLines());
+    const provenance = this.store.provenance();
 
     if (yaml === '') {
       return [];
+    }
+
+    // Only lines an element produced are focusable. Section headers and blank lines map to nothing,
+    // and making them tab stops would bury the ones that do something.
+    const mapped = new Set<number>();
+
+    for (const entry of provenance) {
+      for (let line = entry.startLine; line <= entry.endLine; line += 1) {
+        mapped.add(line);
+      }
     }
 
     return yaml
@@ -50,6 +63,7 @@ export class YamlPane {
         number: index + 1,
         text,
         highlighted: highlighted.has(index + 1),
+        selectable: mapped.has(index + 1),
       }));
   });
 

@@ -1,5 +1,5 @@
 <header class="toolbar">
-  <span class="brand">ComposeLab</span>
+  <h1 class="brand">ComposeLab</h1>
 
   <label class="project">
     <span class="project__label">Project</span>
@@ -83,13 +83,13 @@
 }
 
 <div class="layout">
-  <aside class="layout__palette"><app-component-palette /></aside>
+  <aside class="layout__palette" aria-label="Components"><app-component-palette /></aside>
 
-  <main class="layout__diagram"><app-topology-diagram /></main>
+  <main class="layout__diagram" aria-label="Architecture"><app-topology-diagram /></main>
 
-  <aside class="layout__yaml"><app-yaml-pane /></aside>
+  <aside class="layout__yaml" aria-label="Compose file"><app-yaml-pane /></aside>
 
-  <aside class="layout__inspector"><app-element-inspector /></aside>
+  <aside class="layout__inspector" aria-label="Inspector"><app-element-inspector /></aside>
 
-  <section class="layout__console"><app-simulation-console /></section>
+  <section class="layout__console" aria-label="Simulation"><app-simulation-console /></section>
 </div>

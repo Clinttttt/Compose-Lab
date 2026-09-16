@@ -59,14 +59,26 @@
   <p class="empty">Nothing to generate yet.</p>
 } @else {
   <!-- Read-only. Clicking a line selects whatever element produced it, resolved through the
-       provenance the backend returned. -->
+       provenance the backend returned. Lines that nothing produced are plain text. -->
   <ol class="lines">
     @for (line of lines(); track line.number) {
       <li class="line" [class.line--highlighted]="line.highlighted">
-        <button type="button" class="line__button" (click)="selectLine(line.number)">
-          <span class="line__number" aria-hidden="true">{{ line.number }}</span>
-          <code class="line__text">{{ line.text }}</code>
-        </button>
+        @if (line.selectable) {
+          <button
+            type="button"
+            class="line__button"
+            [attr.aria-label]="'Select what produced line ' + line.number"
+            (click)="selectLine(line.number)"
+          >
+            <span class="line__number" aria-hidden="true">{{ line.number }}</span>
+            <code class="line__text">{{ line.text }}</code>
+          </button>
+        } @else {
+          <span class="line__button line__button--static">
+            <span class="line__number" aria-hidden="true">{{ line.number }}</span>
+            <code class="line__text">{{ line.text }}</code>
+          </span>
+        }
       </li>
     }
   </ol>
