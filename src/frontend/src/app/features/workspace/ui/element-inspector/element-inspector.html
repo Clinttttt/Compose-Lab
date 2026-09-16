@@ -13,7 +13,7 @@
         class="field__input"
         type="text"
         [value]="current.image ?? ''"
-        placeholder="postgres:18"
+        placeholder="image:tag"
         (change)="setImage($event)"
       />
     </label>
@@ -24,7 +24,7 @@
         class="field__input"
         type="text"
         [value]="current.build ?? ''"
-        placeholder="./Api"
+        placeholder="path to a Dockerfile folder"
         (change)="setBuild($event)"
       />
     </label>
@@ -117,8 +117,18 @@
     }
 
     @for (mount of current.volumes; track mount.volume) {
-      <div class="row">
-        <span class="identifier row__grow">{{ mount.volume }}</span>
+      <div class="entry">
+        <div class="entry__head">
+          <code class="entry__key">{{ mount.volume }}</code>
+          <button
+            type="button"
+            class="ghost"
+            [attr.aria-label]="'Remove mount of ' + mount.volume"
+            (click)="removeMount($index)"
+          >
+            <app-icon name="remove" />
+          </button>
+        </div>
         <input
           class="field__input"
           type="text"
@@ -126,14 +136,6 @@
           aria-label="Container path"
           (change)="setMountPath($index, $event)"
         />
-        <button
-          type="button"
-          class="ghost"
-          [attr.aria-label]="'Remove mount of ' + mount.volume"
-          (click)="removeMount($index)"
-        >
-          <app-icon name="remove" />
-        </button>
       </div>
     }
   </div>
@@ -141,9 +143,21 @@
   <div class="section">
     <p class="section__heading">Environment</p>
 
+    <!-- The name gets its own row: a variable like ConnectionStrings__Database has no chance in a
+         shared row, and truncating it to one character hides the thing being edited. -->
     @for (entry of environmentEntries(); track entry.key) {
-      <div class="row">
-        <span class="identifier row__grow">{{ entry.key }}</span>
+      <div class="entry">
+        <div class="entry__head">
+          <code class="entry__key">{{ entry.key }}</code>
+          <button
+            type="button"
+            class="ghost"
+            [attr.aria-label]="'Remove ' + entry.key"
+            (click)="removeEnvironment(entry.key)"
+          >
+            <app-icon name="remove" />
+          </button>
+        </div>
         <input
           class="field__input"
           type="text"
@@ -151,14 +165,6 @@
           [attr.aria-label]="'Value of ' + entry.key"
           (change)="setEnvironmentValue(entry.key, $event)"
         />
-        <button
-          type="button"
-          class="ghost"
-          [attr.aria-label]="'Remove ' + entry.key"
-          (click)="removeEnvironment(entry.key)"
-        >
-          <app-icon name="remove" />
-        </button>
       </div>
     }
 

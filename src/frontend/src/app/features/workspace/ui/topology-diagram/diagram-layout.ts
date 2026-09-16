@@ -11,7 +11,8 @@ import { TopologyDocument } from '../../workspace.model';
  * there is nothing to drag and nothing to keep in sync.
  */
 export const CARD_WIDTH = 168;
-export const CARD_HEIGHT = 88;
+/** Tall enough for the five rows a card can carry: name, source, ports, memberships, and a flag. */
+export const CARD_HEIGHT = 104;
 export const CARD_GAP = 16;
 export const BAND_HEIGHT = 32;
 export const BAND_GAP = 10;

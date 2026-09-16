@@ -5,13 +5,13 @@
     @if (errorCount() > 0) {
       <span class="tally tally--error">
         <app-icon name="error" />
-        <span>{{ errorCount() }} problem(s)</span>
+        <span>{{ count(errorCount(), 'problem', 'problems') }}</span>
       </span>
     }
     @if (warningCount() > 0) {
       <span class="tally tally--warning">
         <app-icon name="warning" />
-        <span>{{ warningCount() }} to review</span>
+        <span>{{ count(warningCount(), 'point to review', 'points to review') }}</span>
       </span>
     }
     @if (errorCount() === 0 && warningCount() === 0 && hasContent()) {

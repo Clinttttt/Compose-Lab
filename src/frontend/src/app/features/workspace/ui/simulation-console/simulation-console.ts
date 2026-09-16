@@ -25,10 +25,17 @@ export class SimulationConsole {
   protected readonly validation = this.store.validation;
   protected readonly hasContent = this.store.hasContent;
 
-  /** Before a run, the cheap check is what there is to show. Afterwards, the run's own findings. */
-  protected readonly issues = computed<readonly ArchitectureIssue[]>(
-    () => this.simulation()?.issues ?? this.validation()?.issues ?? [],
-  );
+  /**
+   * Before a run, the cheap check is what there is to show. Afterwards, the run's own findings.
+   *
+   * Sorted worst-first: when an architecture breaks, the reason has to be the first thing on screen,
+   * not below a note about something that is merely worth knowing.
+   */
+  protected readonly issues = computed<readonly ArchitectureIssue[]>(() => {
+    const found = this.simulation()?.issues ?? this.validation()?.issues ?? [];
+
+    return [...found].sort((left, right) => weight(right.severity) - weight(left.severity));
+  });
 
   protected readonly isComplete = computed(
     () => this.simulation()?.completed ?? this.validation()?.isComplete ?? true,
@@ -64,4 +71,12 @@ export class SimulationConsole {
       ? element.name
       : `${element.ownerService} → ${element.name}`;
   }
+
+  protected count(value: number, singular: string, plural: string): string {
+    return `${value} ${value === 1 ? singular : plural}`;
+  }
+}
+
+function weight(severity: IssueSeverity): number {
+  return severity === 'error' ? 2 : severity === 'warning' ? 1 : 0;
 }

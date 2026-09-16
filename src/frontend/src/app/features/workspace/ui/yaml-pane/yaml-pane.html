@@ -37,7 +37,10 @@
     <section class="findings" aria-label="Reasons this file was not applied">
       <p class="findings__head">
         <app-icon name="error" />
-        <span>Not applied — {{ blockingCount() }} thing(s) to resolve first</span>
+        <span
+          >Not applied — {{ blockingCount() }} {{ blockingCount() === 1 ? 'thing' : 'things' }} to
+          resolve first</span
+        >
       </p>
 
       <ul class="findings__list">
