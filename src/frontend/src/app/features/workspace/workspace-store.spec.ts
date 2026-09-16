@@ -43,6 +43,17 @@ function summary(id: string, name: string) {
   };
 }
 
+function projectResponse(id: string, name: string, services: string[]) {
+  return {
+    id,
+    name,
+    topology: topologyOf(...services),
+    topologySchemaVersion: 1,
+    createdAt: '2026-01-01T00:00:00+00:00',
+    updatedAt: '2026-01-01T00:00:00+00:00',
+  };
+}
+
 describe('WorkspaceStore', () => {
   let store: WorkspaceStore;
   let backend: HttpTestingController;
@@ -399,6 +410,59 @@ describe('WorkspaceStore', () => {
 
       expect(store.pendingProjectId()).toBeNull();
       expect(backend.expectOne('/api/projects/abc').request.method).toBe('GET');
+    });
+
+    /**
+     * Two loads can overlap, and the first can answer last. Only the most recent request may change
+     * the workspace — enforced in the store, not by hoping the selector is disabled in time.
+     */
+    it('lets only the most recent load change the workspace', () => {
+      // 1. Request project A.
+      store.requestOpenProject('project-a');
+      const requestForA = backend.expectOne('/api/projects/project-a');
+
+      // 2. Request project B before A has returned.
+      store.requestOpenProject('project-b');
+      const requestForB = backend.expectOne('/api/projects/project-b');
+
+      // 3. B returns first and loads.
+      requestForB.flush(projectResponse('project-b', 'B lab', ['cache']));
+
+      expect(store.currentProjectId()).toBe('project-b');
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['cache']);
+
+      // 4. A returns afterwards.
+      requestForA.flush(projectResponse('project-a', 'A lab', ['api']));
+
+      // 5. B is still what is open, and A's stale response changed nothing.
+      expect(store.currentProjectId()).toBe('project-b');
+      expect(store.currentProjectName()).toBe('B lab');
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['cache']);
+      expect(store.hasUnsavedChanges()).toBe(false);
+    });
+
+    it('keeps the workspace clean when a discarded switch is overtaken', () => {
+      store.addService(service('api'));
+
+      store.requestOpenProject('project-a');
+      store.discardChangesAndOpenPending();
+      const requestForA = backend.expectOne('/api/projects/project-a');
+
+      // The workspace is still dirty while A is in flight, so switching again is another decision.
+      store.requestOpenProject('project-b');
+      expect(store.pendingProjectId()).toBe('project-b');
+
+      store.discardChangesAndOpenPending();
+      const requestForB = backend.expectOne('/api/projects/project-b');
+
+      requestForB.flush(projectResponse('project-b', 'B lab', ['queue']));
+      requestForA.flush(projectResponse('project-a', 'A lab', ['api']));
+
+      expect(store.currentProjectName()).toBe('B lab');
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['queue']);
+
+      // History was reset by B's load, and A did not resurrect anything.
+      expect(store.canUndo()).toBe(false);
     });
   });
 

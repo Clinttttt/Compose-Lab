@@ -202,6 +202,13 @@ export class WorkspaceStore {
   /** Set when a project switch is waiting on a decision about unsaved work. */
   private readonly pendingOpen = signal<string | null>(null);
 
+  /**
+   * Incremented for every project load. Two loads can overlap — pick one project, change your mind,
+   * pick another — and the first may answer last. Only the most recent request may change the
+   * workspace, or a slow response would quietly replace the project the learner actually opened.
+   */
+  private readonly projectLoadRevision = signal(0);
+
   readonly currentProjectId = this.projectId.asReadonly();
 
   readonly currentProjectName = this.projectName.asReadonly();
@@ -549,8 +556,17 @@ export class WorkspaceStore {
   }
 
   private loadProject(id: string): void {
+    const requestedFor = this.projectLoadRevision() + 1;
+
+    this.projectLoadRevision.set(requestedFor);
+
     this.api.getProject(id).subscribe({
       next: (project) => {
+        if (this.projectLoadRevision() !== requestedFor) {
+          // An older load answering late. The learner has already opened something else.
+          return;
+        }
+
         this.projectId.set(project.id);
         this.projectName.set(project.name);
         this.replace(project.topology);
