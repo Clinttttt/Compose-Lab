@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ComposeLab.Api.Tests/ComposeLab.Api.Tests.csproj" />
+  <Project Path="ComposeLab.Api/ComposeLab.Api.csproj" />
+</Solution>

@@ -1,0 +1,25 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+artifacts/
+
+## Rider / VS Code
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+## Node (frontend, arriving later)
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+
+## Local environment — never commit secrets
+.env
+.env.local
+*.local.json
