@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddApplication()
+    .AddPersistence(builder.Configuration)
     .AddOpenApi()
     .AddProblemDetails()
     .AddExceptionHandler<GlobalExceptionHandler>()

@@ -1,0 +1,26 @@
+# Development database for ComposeLab.
+#
+# This file is also teaching material: it is the architecture ComposeLab explains, running the tool that
+# explains it. The database is not published to the host beyond what a developer needs for psql and
+# migrations, and its data lives in a named volume so it survives the container being recreated.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: composelab
+      POSTGRES_USER: composelab
+      POSTGRES_PASSWORD: composelab
+    ports:
+      # Bound to localhost only: this port exists for migrations and psql, not for other services, which
+      # would reach the database by name on the project network.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - composelab-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U composelab -d composelab"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  composelab-postgres-data:
