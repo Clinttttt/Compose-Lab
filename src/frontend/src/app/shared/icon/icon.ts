@@ -14,7 +14,10 @@ export type IconName =
   | 'error'
   | 'information'
   | 'undo'
-  | 'redo';
+  | 'redo'
+  | 'dock-bottom'
+  | 'dock-right'
+  | 'collapse';
 
 /**
  * The icon set, inlined.
@@ -100,6 +103,17 @@ export type IconName =
         @case ('redo') {
           <path d="m15 14 5-5-5-5" />
           <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+        }
+        @case ('dock-bottom') {
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 15h18" />
+        }
+        @case ('dock-right') {
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M15 3v18" />
+        }
+        @case ('collapse') {
+          <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
         }
       }
     </svg>

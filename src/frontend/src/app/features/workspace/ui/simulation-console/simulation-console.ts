@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Icon, IconName } from '@shared/icon/icon';
+import { ConsoleDock, PanelLayoutStore } from '@core/preferences/panel-layout-store';
 import { WorkspaceStore } from '../../workspace-store';
 import { ArchitectureIssue, ElementReference, IssueSeverity } from '../../workspace.model';
 
@@ -9,6 +10,10 @@ import { ArchitectureIssue, ElementReference, IssueSeverity } from '../../worksp
  * Every event, issue, severity, and explanation shown here came from the backend. Nothing is
  * manufactured client-side: this component decides layout and ordering only, and never decides
  * whether an architecture is correct.
+ *
+ * It behaves like a tool window: it can sit along the bottom, along the right, or be collapsed to its
+ * header. Collapsed keeps the run button and the tallies reachable, because hiding the control that
+ * produces the output would be a strange way to save space.
  */
 @Component({
   selector: 'app-simulation-console',
@@ -16,14 +21,25 @@ import { ArchitectureIssue, ElementReference, IssueSeverity } from '../../worksp
   templateUrl: './simulation-console.html',
   styleUrl: './simulation-console.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[attr.data-dock]': 'dock()' },
 })
 export class SimulationConsole {
   private readonly store = inject(WorkspaceStore);
+  private readonly panels = inject(PanelLayoutStore);
+
+  protected readonly dock = this.panels.consoleDock;
+  protected readonly isCollapsed = computed(() => this.dock() === 'collapsed');
 
   protected readonly simulation = this.store.simulation;
   protected readonly isSimulating = this.store.isSimulating;
   protected readonly validation = this.store.validation;
   protected readonly hasContent = this.store.hasContent;
+
+  protected readonly docks: readonly { value: ConsoleDock; icon: IconName; label: string }[] = [
+    { value: 'bottom', icon: 'dock-bottom', label: 'Dock along the bottom' },
+    { value: 'right', icon: 'dock-right', label: 'Dock along the right' },
+    { value: 'collapsed', icon: 'collapse', label: 'Collapse to the header' },
+  ];
 
   /**
    * Before a run, the cheap check is what there is to show. Afterwards, the run's own findings.
@@ -74,6 +90,10 @@ export class SimulationConsole {
 
   protected count(value: number, singular: string, plural: string): string {
     return `${value} ${value === 1 ? singular : plural}`;
+  }
+
+  protected setDock(dock: ConsoleDock): void {
+    this.panels.setConsoleDock(dock);
   }
 }
 

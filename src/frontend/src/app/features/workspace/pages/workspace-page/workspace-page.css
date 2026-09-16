@@ -229,6 +229,58 @@
 .layout__console {
   grid-area: console;
   max-height: var(--console-max-height);
+  border-top: 1px solid var(--border);
+}
+
+/*
+ * Docked right: the console becomes a column of its own, full height. The fixed columns give up
+ * width first, because the panels that hold wide content are the proportional ones.
+ */
+:host([data-console-dock='right']) .layout {
+  grid-template-columns:
+    var(--palette-width)
+    minmax(260px, 0.8fr)
+    minmax(340px, 1fr)
+    var(--inspector-width)
+    minmax(320px, 0.85fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'palette diagram yaml inspector console';
+}
+
+:host([data-console-dock='right']) .layout__console {
+  max-height: none;
+  border-top: 0;
+  border-left: 1px solid var(--border);
+}
+
+/* Collapsed: the header strip stays, so the run button and the tallies are still reachable. */
+:host([data-console-dock='collapsed']) .layout__console {
+  max-height: none;
+}
+
+/*
+ * Five columns need about 1400px before one of them starts overflowing. Below that the preference is
+ * remembered but cannot be honoured, so the panel falls back to the bottom rather than pushing the
+ * layout wider than the window — the same thing an IDE does when a dock target is too small.
+ */
+@media (max-width: 1439px) {
+  :host([data-console-dock='right']) .layout {
+    grid-template-columns:
+      var(--palette-width)
+      minmax(300px, 0.85fr)
+      minmax(380px, 1.15fr)
+      var(--inspector-width);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'palette diagram yaml inspector'
+      'console console console console';
+  }
+
+  :host([data-console-dock='right']) .layout__console {
+    max-height: var(--console-max-height);
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
 }
 
 /* Narrower desktops: give the proportional columns room by trimming the fixed ones first. */
@@ -250,8 +302,14 @@
  * Below this, four columns stop being readable — the YAML pane cannot hold a line and the inspector
  * form has no room. One column, each panel sized to its content, and the layout scrolls.
  */
+/*
+ * Below this, four columns stop being readable — the YAML pane cannot hold a line and the inspector
+ * form has no room. One column, each panel sized to content, and the layout scrolls. The dock
+ * preference does not apply here: there is only one place a panel can go.
+ */
 @media (max-width: 1279px) {
-  .layout {
+  .layout,
+  :host([data-console-dock='right']) .layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     grid-auto-rows: min-content;
@@ -271,7 +329,8 @@
   .layout__diagram,
   .layout__yaml,
   .layout__inspector,
-  .layout__console {
+  .layout__console,
+  :host([data-console-dock='right']) .layout__console {
     max-height: none;
     border: 0;
     border-top: 1px solid var(--border);

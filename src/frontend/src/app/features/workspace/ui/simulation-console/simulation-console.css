@@ -5,8 +5,45 @@
   /* Capped by the grid area; the columns inside take the scrolling. */
   max-height: 100%;
   overflow: hidden;
-  border-top: 1px solid var(--border);
   background: var(--surface-panel);
+  /* The body reflows to whichever column this panel is docked into, rather than to the viewport. */
+  container-type: inline-size;
+}
+
+/* Borders belong to the page, which is the only thing that knows where this panel ended up. */
+:host([data-dock='collapsed']) {
+  max-height: none;
+  overflow: visible;
+}
+
+.dock {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dock__button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-1);
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.dock__button:hover {
+  color: var(--text);
+}
+
+/* Selected placement carries a filled background as well as colour, and aria-pressed for anything
+   that is not looking at it. */
+.dock__button--active {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text);
 }
 
 .head {
@@ -92,26 +129,31 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
-/* Stacked layout: one column each, and the page scrolls rather than the panel. */
+/* Too narrow for two columns — which is the normal case when docked right. */
+@container (max-width: 780px) {
+  .body:has(.column--timeline) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .column--timeline {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* Stacked layout: the page scrolls rather than the panel. */
 @media (max-width: 1279px) {
   :host {
     max-height: none;
     overflow: visible;
   }
 
-  .body,
-  .body:has(.column--timeline) {
-    grid-template-columns: minmax(0, 1fr);
+  .body {
     overflow: visible;
   }
 
   .column {
     overflow: visible;
-  }
-
-  .column--timeline {
-    border-left: 0;
-    border-top: 1px solid var(--border);
   }
 }
 

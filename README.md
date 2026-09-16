@@ -77,6 +77,11 @@ as a dashed band marked *supplied by Compose*, and the generated file does not m
 is Compose's behaviour rather than your configuration. And a broken architecture saves fine: storage
 keeps your work, the engine explains it.
 
+The simulation panel is a tool window. The three buttons in its header dock it along the bottom, dock
+it along the right, or collapse it to its header — the run button and the problem count stay reachable
+either way. The choice is remembered between sessions, and below about 1400px wide the right dock
+falls back to the bottom rather than squeezing the columns.
+
 ## Verify
 
 ```bash

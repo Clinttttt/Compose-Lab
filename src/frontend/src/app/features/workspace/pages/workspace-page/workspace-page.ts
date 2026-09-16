@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { Icon } from '@shared/icon/icon';
+import { PanelLayoutStore } from '@core/preferences/panel-layout-store';
 import { WorkspaceStore } from '../../workspace-store';
 import { ComponentPalette } from '../../ui/component-palette/component-palette';
 import { ElementInspector } from '../../ui/element-inspector/element-inspector';
@@ -20,10 +21,16 @@ import { YamlPane } from '../../ui/yaml-pane/yaml-pane';
   templateUrl: './workspace-page.html',
   styleUrl: './workspace-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(document:keydown)': 'onKeydown($event)' },
+  host: {
+    '(document:keydown)': 'onKeydown($event)',
+    '[attr.data-console-dock]': 'consoleDock()',
+  },
 })
 export class WorkspacePage implements OnInit {
   private readonly store = inject(WorkspaceStore);
+  private readonly panels = inject(PanelLayoutStore);
+
+  protected readonly consoleDock = this.panels.consoleDock;
 
   protected readonly projectName = this.store.currentProjectName;
   protected readonly isSaved = this.store.isSaved;

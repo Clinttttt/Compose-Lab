@@ -26,76 +26,97 @@
     <app-icon name="simulate" />
     <span>{{ isSimulating() ? 'Running…' : 'Run simulation' }}</span>
   </button>
+
+  <!-- Tool-window placement, the way an IDE does it. Icon-only, so each button carries its own label. -->
+  <div class="dock" role="group" aria-label="Simulation panel position">
+    @for (option of docks; track option.value) {
+      <button
+        type="button"
+        class="dock__button"
+        [class.dock__button--active]="dock() === option.value"
+        [attr.aria-pressed]="dock() === option.value"
+        [attr.aria-label]="option.label"
+        [title]="option.label"
+        (click)="setDock(option.value)"
+      >
+        <app-icon [name]="option.icon" />
+      </button>
+    }
+  </div>
 </header>
 
-<!-- Honest about its own limits: structural faults stop the advisory pass, so the list below is not
-     the whole story yet. -->
-@if (!isComplete()) {
-  <p class="notice" role="status">
-    <app-icon name="warning" />
-    <span>
-      Structural faults stopped the check before the rest could run. Fix these first — there may be
-      more to find afterwards.
-    </span>
-  </p>
-}
+@if (!isCollapsed()) {
+  <!-- Honest about its own limits: structural faults stop the advisory pass, so the list below is not
+       the whole story yet. -->
+  @if (!isComplete()) {
+    <p class="notice" role="status">
+      <app-icon name="warning" />
+      <span>
+        Structural faults stopped the check before the rest could run. Fix these first — there may
+        be more to find afterwards.
+      </span>
+    </p>
+  }
 
-<div class="body">
-  <section class="column" aria-label="Findings">
-    @if (issues().length === 0) {
-      <p class="empty">
-        {{ hasContent() ? 'Nothing to report for this architecture.' : 'Add a service to begin.' }}
-      </p>
-    }
+  <div class="body">
+    <section class="column" aria-label="Findings">
+      @if (issues().length === 0) {
+        <p class="empty">
+          {{
+            hasContent() ? 'Nothing to report for this architecture.' : 'Add a service to begin.'
+          }}
+        </p>
+      }
 
-    @for (issue of issues(); track $index) {
-      <article class="issue" [class]="'issue--' + issue.severity">
-        <p class="issue__head">
-          <app-icon [name]="iconFor(issue.severity)" />
-          <span class="issue__label">{{ labelFor(issue.severity) }}</span>
-          <code class="issue__code">{{ issue.code }}</code>
+      @for (issue of issues(); track $index) {
+        <article class="issue" [class]="'issue--' + issue.severity">
+          <p class="issue__head">
+            <app-icon [name]="iconFor(issue.severity)" />
+            <span class="issue__label">{{ labelFor(issue.severity) }}</span>
+            <code class="issue__code">{{ issue.code }}</code>
+          </p>
+
+          <p class="issue__what">{{ issue.whatHappened }}</p>
+
+          <dl class="issue__detail">
+            <dt>Why</dt>
+            <dd>{{ issue.why }}</dd>
+            <dt>What happens</dt>
+            <dd>{{ issue.architectureBehavior }}</dd>
+            <dt>Try</dt>
+            <dd>{{ issue.suggestedFix }}</dd>
+          </dl>
+
+          @if (issue.elements.length > 0) {
+            <p class="issue__elements">
+              @for (element of issue.elements; track $index) {
+                <button type="button" class="chip" (click)="focus(element)">
+                  {{ describe(element) }}
+                </button>
+              }
+            </p>
+          }
+        </article>
+      }
+    </section>
+
+    @if (simulation(); as result) {
+      <section class="column column--timeline" aria-label="Timeline">
+        <p class="timeline__order">
+          Start order:
+          <code>{{ result.startOrder.join(' → ') }}</code>
         </p>
 
-        <p class="issue__what">{{ issue.whatHappened }}</p>
-
-        <dl class="issue__detail">
-          <dt>Why</dt>
-          <dd>{{ issue.why }}</dd>
-          <dt>What happens</dt>
-          <dd>{{ issue.architectureBehavior }}</dd>
-          <dt>Try</dt>
-          <dd>{{ issue.suggestedFix }}</dd>
-        </dl>
-
-        @if (issue.elements.length > 0) {
-          <p class="issue__elements">
-            @for (element of issue.elements; track $index) {
-              <button type="button" class="chip" (click)="focus(element)">
-                {{ describe(element) }}
-              </button>
-            }
-          </p>
-        }
-      </article>
+        <ol class="timeline">
+          @for (event of result.events; track event.step) {
+            <li class="event" [class]="'event--' + event.severity">
+              <span class="event__step" aria-hidden="true">{{ event.step }}</span>
+              <span class="event__phase">{{ event.phase.replace('_', ' ') }}</span>
+              <span class="event__message">{{ event.message }}</span>
+            </li>
+          }
+        </ol>
+      </section>
     }
-  </section>
-
-  @if (simulation(); as result) {
-    <section class="column column--timeline" aria-label="Timeline">
-      <p class="timeline__order">
-        Start order:
-        <code>{{ result.startOrder.join(' → ') }}</code>
-      </p>
-
-      <ol class="timeline">
-        @for (event of result.events; track event.step) {
-          <li class="event" [class]="'event--' + event.severity">
-            <span class="event__step" aria-hidden="true">{{ event.step }}</span>
-            <span class="event__phase">{{ event.phase.replace('_', ' ') }}</span>
-            <span class="event__message">{{ event.message }}</span>
-          </li>
-        }
-      </ol>
-    </section>
-  }
-</div>
+  </div>
+}
