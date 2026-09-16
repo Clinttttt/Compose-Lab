@@ -1,0 +1,92 @@
+<h2 class="panel__title">Workspace</h2>
+
+@if (topology().services.length === 0 && layout().bands.length === 0) {
+  <p class="empty">Add a service from the Components panel to start an architecture.</p>
+} @else {
+  <div class="canvas" [style.width.px]="layout().width" [style.height.px]="layout().height">
+    <!-- Decorative only. Every relationship drawn here is also stated on the card and in the
+         inspector, so hiding it from assistive technology loses nothing. -->
+    <svg
+      class="connectors"
+      [attr.width]="layout().width"
+      [attr.height]="layout().height"
+      aria-hidden="true"
+      focusable="false"
+    >
+      @for (connector of layout().connectors; track $index) {
+        <line
+          [attr.x1]="connector.x"
+          [attr.y1]="connector.y1"
+          [attr.x2]="connector.x"
+          [attr.y2]="connector.y2"
+          [class.connectors__line--volume]="connector.kind === 'volume'"
+          class="connectors__line"
+        />
+      }
+    </svg>
+
+    @for (card of cards(); track card.service.name) {
+      <button
+        type="button"
+        class="node card"
+        [class.node--selected]="isSelected('service', card.service.name)"
+        [class.card--error]="card.severity === 'error'"
+        [class.card--warning]="card.severity === 'warning'"
+        [attr.aria-pressed]="isSelected('service', card.service.name)"
+        [style.left.px]="card.x"
+        [style.width.px]="cardWidth"
+        [style.height.px]="cardHeight"
+        (click)="selectService(card.service)"
+      >
+        <span class="card__head">
+          <app-icon name="service" />
+          <span class="card__name">{{ card.service.name }}</span>
+          @if (card.severity !== null) {
+            <app-icon [name]="card.severity === 'error' ? 'error' : 'warning'" />
+          }
+        </span>
+
+        <span class="card__source">{{
+          card.service.image ?? card.service.build ?? 'no image'
+        }}</span>
+
+        @if (card.published.length > 0) {
+          <span class="card__ports">host {{ card.published.join(', ') }}</span>
+        } @else {
+          <span class="card__ports card__ports--internal">not published</span>
+        }
+
+        <!-- Membership in text, not only as a line. -->
+        <span class="card__memberships">
+          @if (card.service.networks.length > 0) {
+            <span>{{ card.service.networks.join(', ') }}</span>
+          } @else {
+            <span class="card__memberships--implied">default network</span>
+          }
+        </span>
+
+        @if (card.severity !== null) {
+          <span class="card__flag">{{ card.severity === 'error' ? 'Problem' : 'Review' }}</span>
+        }
+      </button>
+    }
+
+    @for (band of layout().bands; track band.kind + band.name) {
+      <button
+        type="button"
+        class="node band"
+        [class.band--volume]="band.kind === 'volume'"
+        [class.node--selected]="isSelected(band.kind, band.name)"
+        [attr.aria-pressed]="isSelected(band.kind, band.name)"
+        [style.top.px]="band.y"
+        [style.width.px]="layout().width"
+        [style.height.px]="bandHeight"
+        (click)="selectBand(band.kind, band.name)"
+      >
+        <app-icon [name]="band.kind === 'volume' ? 'volume' : 'network'" />
+        <span class="band__name">{{ band.name }}</span>
+        <span class="band__kind">{{ band.kind === 'volume' ? 'named volume' : 'network' }}</span>
+      </button>
+    }
+  </div>
+}

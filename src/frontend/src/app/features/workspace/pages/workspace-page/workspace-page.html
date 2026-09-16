@@ -1,0 +1,57 @@
+<header class="toolbar">
+  <span class="brand">ComposeLab</span>
+
+  <label class="project">
+    <span class="project__label">Project</span>
+    <input
+      class="project__name"
+      type="text"
+      [value]="projectName()"
+      aria-label="Project name"
+      (change)="rename($event)"
+    />
+  </label>
+
+  <!-- Unsaved state is a word, not a coloured dot. -->
+  @if (hasUnsavedChanges()) {
+    <span class="state state--dirty">Unsaved changes</span>
+  } @else if (isSaved()) {
+    <span class="state">Saved</span>
+  }
+
+  <label class="open">
+    <span class="project__label">Open</span>
+    <select class="open__select" aria-label="Open a saved project" (change)="open($event)">
+      <option value="">Saved projects…</option>
+      @for (project of savedProjects(); track project.id) {
+        <option [value]="project.id">{{ project.name }}</option>
+      }
+    </select>
+  </label>
+
+  @if (validation(); as report) {
+    <span class="state" [class.state--invalid]="!report.isValid">
+      {{ report.isValid ? 'Architecture valid' : 'Architecture has problems' }}
+      @if (!report.isComplete) {
+        <span class="state__qualifier">(checked so far)</span>
+      }
+    </span>
+  }
+
+  <button type="button" class="save" [disabled]="isSaving()" (click)="save()">
+    <app-icon name="save" />
+    <span>{{ isSaving() ? 'Saving…' : 'Save project' }}</span>
+  </button>
+</header>
+
+<div class="layout">
+  <aside class="layout__palette"><app-component-palette /></aside>
+
+  <main class="layout__diagram"><app-topology-diagram /></main>
+
+  <aside class="layout__yaml"><app-yaml-pane /></aside>
+
+  <aside class="layout__inspector"><app-element-inspector /></aside>
+
+  <section class="layout__console"><app-simulation-console /></section>
+</div>

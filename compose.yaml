@@ -11,11 +11,18 @@ services:
       POSTGRES_USER: composelab
       POSTGRES_PASSWORD: composelab
     ports:
-      # Bound to localhost only: this port exists for migrations and psql, not for other services, which
-      # would reach the database by name on the project network.
-      - "127.0.0.1:5432:5432"
+      # Bound to localhost only: this port exists for migrations and psql, not for other services,
+      # which would reach the database by name on the project network.
+      #
+      # A high port rather than 5432, because 5432 is commonly taken on a developer machine — by
+      # another Postgres, or by a Windows reserved port range. Nothing inside the project cares: the
+      # container port is unchanged and service-to-service traffic never goes through the host.
+      - "127.0.0.1:55432:5432"
     volumes:
-      - composelab-postgres-data:/var/lib/postgresql/data
+      # postgres:18 wants a single mount at /var/lib/postgresql and places its data in a subdirectory
+      # itself. Mounting /var/lib/postgresql/data — the path taught for postgres:17 and earlier — makes
+      # the container exit on startup.
+      - composelab-postgres-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U composelab -d composelab"]
       interval: 5s

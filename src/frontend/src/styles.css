@@ -1,0 +1,100 @@
+/*
+ * ComposeLab interface tokens.
+ *
+ * One dark theme. Four interface colours carry the whole layout — page, panel, border, and a single
+ * accent for selection and primary action. Foreground tokens are readability, not palette.
+ *
+ * The three semantic colours are reserved for state. They never become decorative accents, and no
+ * state is communicated by colour alone: every one is paired with a label, an icon, or a border
+ * treatment.
+ */
+:root {
+  /* Interface */
+  --surface-page: #0f1115;
+  --surface-panel: #171a20;
+  --border: #262b33;
+  --accent: #5b8dd9;
+
+  /* Foreground */
+  --text: #e4e7ea;
+  --text-muted: #98a1ac;
+  --text-faint: #6b747f;
+
+  /* Semantic — state only */
+  --success: #5a9e78;
+  --warning: #c1913f;
+  --error: #cf6a70;
+
+  /* Spacing, on a 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius: 3px;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 15px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface-page);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Identifiers, paths, ports, and YAML are monospace: it is what makes `postgres-data` read as a
+   name rather than as prose. */
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* A visible focus ring is not optional: the diagram is navigated by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}

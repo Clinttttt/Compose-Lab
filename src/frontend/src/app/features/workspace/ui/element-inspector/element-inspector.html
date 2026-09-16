@@ -1,0 +1,215 @@
+<h2 class="panel__title">Inspector</h2>
+
+@if (service(); as current) {
+  <div class="section">
+    <p class="section__heading">
+      <app-icon name="service" />
+      <span class="identifier">{{ current.name }}</span>
+    </p>
+
+    <label class="field">
+      <span class="field__label">Image</span>
+      <input
+        class="field__input"
+        type="text"
+        [value]="current.image ?? ''"
+        placeholder="postgres:18"
+        (change)="setImage($event)"
+      />
+    </label>
+
+    <label class="field">
+      <span class="field__label">Build context</span>
+      <input
+        class="field__input"
+        type="text"
+        [value]="current.build ?? ''"
+        placeholder="./Api"
+        (change)="setBuild($event)"
+      />
+    </label>
+  </div>
+
+  <div class="section">
+    <p class="section__heading">
+      <span>Published ports</span>
+      <button type="button" class="ghost" (click)="addPort()">
+        <app-icon name="add" />
+        <span>Add</span>
+      </button>
+    </p>
+
+    @if (current.ports.length === 0) {
+      <p class="hint">
+        Not published. Other services still reach this one by name on a shared network, using its
+        container port.
+      </p>
+    }
+
+    @for (port of current.ports; track $index) {
+      <div class="row">
+        <input
+          class="field__input field__input--port"
+          type="number"
+          [value]="port.hostPort ?? ''"
+          placeholder="host"
+          aria-label="Host port"
+          (change)="setHostPort($index, $event)"
+        />
+        <span class="row__arrow" aria-hidden="true">→</span>
+        <input
+          class="field__input field__input--port"
+          type="number"
+          [value]="port.containerPort"
+          placeholder="container"
+          aria-label="Container port"
+          (change)="setContainerPort($index, $event)"
+        />
+        <button
+          type="button"
+          class="ghost"
+          [attr.aria-label]="'Remove port mapping ' + ($index + 1)"
+          (click)="removePort($index)"
+        >
+          <app-icon name="remove" />
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="section">
+    <p class="section__heading">Networks</p>
+
+    @if (topology().networks.length === 0) {
+      <p class="hint">
+        No networks declared. Compose puts services that name none on one implied network, which is
+        why they can often reach each other with nothing written down.
+      </p>
+    }
+
+    @for (network of topology().networks; track network.name) {
+      <label class="check">
+        <input
+          type="checkbox"
+          [checked]="current.networks.includes(network.name)"
+          (change)="toggleNetwork(network.name)"
+        />
+        <span class="identifier">{{ network.name }}</span>
+      </label>
+    }
+  </div>
+
+  <div class="section">
+    <p class="section__heading">Volume mounts</p>
+
+    @if (topology().volumes.length > 0) {
+      <label class="field">
+        <span class="field__label">Mount a declared volume</span>
+        <select class="field__input" (change)="addMount($event)">
+          <option value="">Choose a volume…</option>
+          @for (volume of topology().volumes; track volume.name) {
+            <option [value]="volume.name">{{ volume.name }}</option>
+          }
+        </select>
+      </label>
+    } @else {
+      <p class="hint">No named volumes declared.</p>
+    }
+
+    @for (mount of current.volumes; track mount.volume) {
+      <div class="row">
+        <span class="identifier row__grow">{{ mount.volume }}</span>
+        <input
+          class="field__input"
+          type="text"
+          [value]="mount.path"
+          aria-label="Container path"
+          (change)="setMountPath($index, $event)"
+        />
+        <button
+          type="button"
+          class="ghost"
+          [attr.aria-label]="'Remove mount of ' + mount.volume"
+          (click)="removeMount($index)"
+        >
+          <app-icon name="remove" />
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="section">
+    <p class="section__heading">Environment</p>
+
+    @for (entry of environmentEntries(); track entry.key) {
+      <div class="row">
+        <span class="identifier row__grow">{{ entry.key }}</span>
+        <input
+          class="field__input"
+          type="text"
+          [value]="entry.value"
+          [attr.aria-label]="'Value of ' + entry.key"
+          (change)="setEnvironmentValue(entry.key, $event)"
+        />
+        <button
+          type="button"
+          class="ghost"
+          [attr.aria-label]="'Remove ' + entry.key"
+          (click)="removeEnvironment(entry.key)"
+        >
+          <app-icon name="remove" />
+        </button>
+      </div>
+    }
+
+    <div class="row">
+      <input
+        #newKey
+        class="field__input row__grow"
+        type="text"
+        placeholder="NEW_VARIABLE"
+        aria-label="New environment variable name"
+      />
+      <button type="button" class="ghost" (click)="addEnvironment(newKey)">
+        <app-icon name="add" />
+        <span>Add</span>
+      </button>
+    </div>
+  </div>
+
+  <button type="button" class="danger" (click)="removeService()">
+    <app-icon name="remove" />
+    <span>Remove {{ current.name }}</span>
+  </button>
+} @else if (selected(); as element) {
+  <div class="section">
+    <p class="section__heading">
+      <app-icon [name]="element.kind === 'volume' ? 'volume' : 'network'" />
+      <span class="identifier">{{ element.name }}</span>
+    </p>
+    <p class="hint">{{ element.kind === 'volume' ? 'Named volume' : 'Network' }}</p>
+  </div>
+
+  <div class="section">
+    <p class="section__heading">
+      {{ element.kind === 'volume' ? 'Mounted by' : 'Attached services' }}
+    </p>
+
+    @if (relatedServices().length === 0) {
+      <p class="hint">Nothing uses this yet.</p>
+    } @else {
+      <ul class="list">
+        @for (name of relatedServices(); track name) {
+          <li class="identifier">{{ name }}</li>
+        }
+      </ul>
+    }
+  </div>
+
+  <button type="button" class="danger" (click)="removeSelectedResource()">
+    <app-icon name="remove" />
+    <span>Remove {{ element.name }}</span>
+  </button>
+} @else {
+  <p class="hint">Select a service, network, or volume to inspect and edit it.</p>
+}

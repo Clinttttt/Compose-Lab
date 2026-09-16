@@ -1,0 +1,13 @@
+<!--
+  The shell owns nothing but the transport-error strip. Everything about an architecture belongs to
+  the workspace.
+-->
+@if (transportError(); as message) {
+  <div class="transport-error" role="alert">
+    <span class="transport-error__label">API unreachable</span>
+    <span>{{ message }}</span>
+    <button type="button" class="transport-error__dismiss" (click)="dismissError()">Dismiss</button>
+  </div>
+}
+
+<router-outlet />

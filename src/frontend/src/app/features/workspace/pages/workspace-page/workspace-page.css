@@ -1,0 +1,134 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-panel);
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.project,
+.open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.project__label {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.project__name,
+.open__select {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-page);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.project__name {
+  width: 200px;
+}
+
+.state {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.state--dirty {
+  color: var(--warning);
+}
+
+.state--invalid {
+  color: var(--error);
+}
+
+.state__qualifier {
+  color: var(--text-faint);
+}
+
+.save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.save:disabled {
+  border-color: var(--border);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* Three columns over a full-width console. Density over decoration: no nested cards, no shadows. */
+.layout {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1.4fr) minmax(0, 1fr) 300px;
+  grid-template-rows: minmax(0, 1fr) minmax(200px, 0.8fr);
+  grid-template-areas:
+    'palette diagram yaml inspector'
+    'console console console console';
+  flex: 1;
+  min-height: 0;
+}
+
+.layout__palette {
+  grid-area: palette;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-panel);
+}
+
+.layout__diagram {
+  grid-area: diagram;
+  min-height: 0;
+}
+
+.layout__yaml {
+  grid-area: yaml;
+  min-height: 0;
+  display: flex;
+}
+
+.layout__yaml app-yaml-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.layout__inspector {
+  grid-area: inspector;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface-panel);
+}
+
+.layout__console {
+  grid-area: console;
+  min-height: 0;
+  display: flex;
+}
+
+.layout__console app-simulation-console {
+  flex: 1;
+  min-width: 0;
+}

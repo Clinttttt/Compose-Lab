@@ -1,0 +1,101 @@
+<header class="head">
+  <h2 class="panel__title">Simulation</h2>
+
+  <div class="summary">
+    @if (errorCount() > 0) {
+      <span class="tally tally--error">
+        <app-icon name="error" />
+        <span>{{ errorCount() }} problem(s)</span>
+      </span>
+    }
+    @if (warningCount() > 0) {
+      <span class="tally tally--warning">
+        <app-icon name="warning" />
+        <span>{{ warningCount() }} to review</span>
+      </span>
+    }
+    @if (errorCount() === 0 && warningCount() === 0 && hasContent()) {
+      <span class="tally tally--ok">
+        <app-icon name="validate" />
+        <span>No problems found</span>
+      </span>
+    }
+  </div>
+
+  <button type="button" class="run" [disabled]="isSimulating() || !hasContent()" (click)="run()">
+    <app-icon name="simulate" />
+    <span>{{ isSimulating() ? 'Running…' : 'Run simulation' }}</span>
+  </button>
+</header>
+
+<!-- Honest about its own limits: structural faults stop the advisory pass, so the list below is not
+     the whole story yet. -->
+@if (!isComplete()) {
+  <p class="notice" role="status">
+    <app-icon name="warning" />
+    <span>
+      Structural faults stopped the check before the rest could run. Fix these first — there may be
+      more to find afterwards.
+    </span>
+  </p>
+}
+
+<div class="body">
+  <section class="column" aria-label="Findings">
+    @if (issues().length === 0) {
+      <p class="empty">
+        {{ hasContent() ? 'Nothing to report for this architecture.' : 'Add a service to begin.' }}
+      </p>
+    }
+
+    @for (issue of issues(); track $index) {
+      <article class="issue" [class]="'issue--' + issue.severity">
+        <p class="issue__head">
+          <app-icon [name]="iconFor(issue.severity)" />
+          <span class="issue__label">{{ labelFor(issue.severity) }}</span>
+          <code class="issue__code">{{ issue.code }}</code>
+        </p>
+
+        <p class="issue__what">{{ issue.whatHappened }}</p>
+
+        <dl class="issue__detail">
+          <dt>Why</dt>
+          <dd>{{ issue.why }}</dd>
+          <dt>What happens</dt>
+          <dd>{{ issue.architectureBehavior }}</dd>
+          <dt>Try</dt>
+          <dd>{{ issue.suggestedFix }}</dd>
+        </dl>
+
+        @if (issue.elements.length > 0) {
+          <p class="issue__elements">
+            @for (element of issue.elements; track $index) {
+              <button type="button" class="chip" (click)="focus(element)">
+                {{ describe(element) }}
+              </button>
+            }
+          </p>
+        }
+      </article>
+    }
+  </section>
+
+  @if (simulation(); as result) {
+    <section class="column column--timeline" aria-label="Timeline">
+      <p class="timeline__order">
+        Start order:
+        <code>{{ result.startOrder.join(' → ') }}</code>
+      </p>
+
+      <ol class="timeline">
+        @for (event of result.events; track event.step) {
+          <li class="event" [class]="'event--' + event.severity">
+            <span class="event__step" aria-hidden="true">{{ event.step }}</span>
+            <span class="event__phase">{{ event.phase.replace('_', ' ') }}</span>
+            <span class="event__message">{{ event.message }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+</div>

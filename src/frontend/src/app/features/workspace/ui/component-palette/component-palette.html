@@ -1,0 +1,41 @@
+<h2 class="panel__title">Components</h2>
+
+<div class="group">
+  <p class="group__label">Start from</p>
+  <button type="button" class="action action--wide" (click)="addReferenceArchitecture()">
+    <app-icon name="add" />
+    <span>API and PostgreSQL</span>
+  </button>
+</div>
+
+<div class="group">
+  <p class="group__label">Services</p>
+  <button type="button" class="action" (click)="addService('api')">
+    <app-icon name="service" />
+    <span>ASP.NET API</span>
+  </button>
+  <button type="button" class="action" (click)="addService('postgres')">
+    <app-icon name="service" />
+    <span>PostgreSQL</span>
+  </button>
+  <button type="button" class="action" (click)="addService('redis')">
+    <app-icon name="service" />
+    <span>Redis</span>
+  </button>
+  <button type="button" class="action" (click)="addService('generic')">
+    <app-icon name="service" />
+    <span>Generic service</span>
+  </button>
+</div>
+
+<div class="group">
+  <p class="group__label">Resources</p>
+  <button type="button" class="action" (click)="addNetwork()">
+    <app-icon name="network" />
+    <span>Network</span>
+  </button>
+  <button type="button" class="action" (click)="addVolume()">
+    <app-icon name="volume" />
+    <span>Named volume</span>
+  </button>
+</div>
