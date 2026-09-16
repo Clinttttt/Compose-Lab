@@ -17,6 +17,32 @@ function service(name: string): ServiceDocument {
   };
 }
 
+function topologyOf(...names: string[]) {
+  return { services: names.map(service), networks: [], volumes: [] };
+}
+
+function simulationResult(startOrder: string[]) {
+  return {
+    succeeded: true,
+    completed: true,
+    startOrder,
+    events: [],
+    issues: [],
+    reachability: [],
+    inferredConnections: [],
+  };
+}
+
+function summary(id: string, name: string) {
+  return {
+    id,
+    name,
+    topologySchemaVersion: 1,
+    createdAt: '2026-01-01T00:00:00+00:00',
+    updatedAt: '2026-01-01T00:00:00+00:00',
+  };
+}
+
 describe('WorkspaceStore', () => {
   let store: WorkspaceStore;
   let backend: HttpTestingController;
@@ -120,15 +146,7 @@ describe('WorkspaceStore', () => {
     it('drops a stale result when the architecture changes underneath it', () => {
       store.simulate();
 
-      backend.expectOne('/api/topology/simulate').flush({
-        succeeded: true,
-        completed: true,
-        startOrder: ['api'],
-        events: [],
-        issues: [],
-        reachability: [],
-        inferredConnections: [],
-      });
+      backend.expectOne('/api/topology/simulate').flush(simulationResult(['api']));
 
       expect(store.simulation()).not.toBeNull();
 
@@ -136,6 +154,42 @@ describe('WorkspaceStore', () => {
 
       // A timeline describes the architecture it was run against.
       expect(store.simulation()).toBeNull();
+    });
+
+    /**
+     * The inverse of the case above, and the one that actually races: the request is already in
+     * flight when the topology moves on, so the response arrives describing an architecture that no
+     * longer exists. Keyed on a revision rather than on timing.
+     */
+    it('ignores a response that arrives after the topology has moved on', () => {
+      store.addService(service('api'));
+
+      store.simulate();
+
+      const inFlight = backend.expectOne('/api/topology/simulate');
+
+      // The learner keeps working while the request is outstanding.
+      store.addService(service('cache'));
+
+      inFlight.flush(simulationResult(['api']));
+
+      expect(store.simulation()).toBeNull();
+      expect(store.isSimulating()).toBe(false);
+    });
+
+    it('keeps a response that arrives while the topology is unchanged', () => {
+      store.addService(service('api'));
+
+      store.simulate();
+
+      const inFlight = backend.expectOne('/api/topology/simulate');
+
+      // Selecting something is not a change to the architecture.
+      store.select({ kind: 'service', name: 'api', ownerService: null, detail: null });
+
+      inFlight.flush(simulationResult(['api']));
+
+      expect(store.simulation()?.startOrder).toEqual(['api']);
     });
   });
 
@@ -171,6 +225,115 @@ describe('WorkspaceStore', () => {
       store.save();
 
       expect(backend.expectOne('/api/projects').request.method).toBe('POST');
+    });
+
+    /** Renaming a saved project is a change to the project, so it must read as unsaved. */
+    it('counts a rename as an unsaved change', () => {
+      store.addService(service('api'));
+      store.save();
+      backend.expectOne('/api/projects').flush('11111111-1111-1111-1111-111111111111');
+      backend.expectOne('/api/projects').flush({ projects: [] });
+
+      expect(store.hasUnsavedChanges()).toBe(false);
+
+      store.rename('E-commerce lab');
+
+      expect(store.hasUnsavedChanges()).toBe(true);
+
+      store.save();
+      backend.expectOne('/api/projects/11111111-1111-1111-1111-111111111111').flush(null);
+      backend.expectOne('/api/projects').flush({ projects: [] });
+
+      expect(store.hasUnsavedChanges()).toBe(false);
+    });
+
+    /** Summaries refresh because a save succeeded, not because a timer elapsed. */
+    it('refreshes the project list as a consequence of a successful save', () => {
+      store.addService(service('api'));
+      store.save();
+
+      backend.expectOne('/api/projects').flush('22222222-2222-2222-2222-222222222222');
+
+      // The list request is issued by the save completing.
+      backend
+        .expectOne('/api/projects')
+        .flush({ projects: [summary('22222222-2222-2222-2222-222222222222', 'Saved')] });
+
+      expect(store.savedProjects().map((project) => project.name)).toEqual(['Saved']);
+    });
+
+    it('does not refresh the list when a save fails', () => {
+      store.addService(service('api'));
+      store.save();
+
+      backend
+        .expectOne('/api/projects')
+        .flush({ title: 'nope' }, { status: 500, statusText: 'Server Error' });
+
+      backend.expectNone('/api/projects');
+      expect(store.hasUnsavedChanges()).toBe(true);
+    });
+  });
+
+  describe('opening another project', () => {
+    /**
+     * ComposeLab saves only when told to, so switching projects with unsaved work has to be a
+     * decision rather than something that happens quietly.
+     */
+    it('waits for a decision when there are unsaved changes', () => {
+      store.refreshProjects();
+      backend.expectOne('/api/projects').flush({ projects: [summary('abc', 'Other lab')] });
+
+      store.addService(service('api'));
+
+      store.requestOpenProject('abc');
+
+      // Nothing has been fetched and nothing has been replaced.
+      backend.expectNone('/api/projects/abc');
+      expect(store.pendingProjectId()).toBe('abc');
+      expect(store.pendingProjectName()).toBe('Other lab');
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api']);
+    });
+
+    it('keeps the workspace when the decision is to stay', () => {
+      store.addService(service('api'));
+      store.requestOpenProject('abc');
+
+      store.cancelPendingOpen();
+
+      expect(store.pendingProjectId()).toBeNull();
+      backend.expectNone('/api/projects/abc');
+      expect(store.authoredTopology().services).toHaveLength(1);
+    });
+
+    it('replaces the workspace only once the change is explicitly discarded', () => {
+      store.addService(service('api'));
+      store.requestOpenProject('abc');
+
+      store.discardChangesAndOpenPending();
+
+      backend.expectOne('/api/projects/abc').flush({
+        id: 'abc',
+        name: 'Other lab',
+        topology: topologyOf('cache'),
+        topologySchemaVersion: 1,
+        createdAt: '2026-01-01T00:00:00+00:00',
+        updatedAt: '2026-01-01T00:00:00+00:00',
+      });
+
+      expect(store.pendingProjectId()).toBeNull();
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['cache']);
+      expect(store.currentProjectName()).toBe('Other lab');
+
+      // A freshly loaded project is not dirty.
+      expect(store.hasUnsavedChanges()).toBe(false);
+    });
+
+    it('opens straight away when there is nothing to lose', () => {
+      store.requestOpenProject('abc');
+
+      expect(store.pendingProjectId()).toBeNull();
+      expect(backend.expectOne('/api/projects/abc').request.method).toBe('GET');
     });
   });
 });

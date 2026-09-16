@@ -7,6 +7,7 @@ import {
   ElementReference,
   emptyTopology,
   GenerateComposeResponse,
+  ProjectSummary,
   ProvenanceEntry,
   sameElement,
   ServiceDocument,
@@ -14,6 +15,9 @@ import {
   TopologyDocument,
   ValidateResponse,
 } from './workspace.model';
+
+/** The name a workspace starts with, so an untouched one does not read as having unsaved work. */
+const INITIAL_NAME = 'Untitled architecture';
 
 /**
  * The workspace's single working source of truth.
@@ -32,6 +36,13 @@ export class WorkspaceStore {
   // --- The working topology -------------------------------------------------
 
   private readonly topology = signal<TopologyDocument>(emptyTopology());
+
+  /**
+   * Incremented on every replacement. An in-flight request that returns after the architecture has
+   * moved on carries an answer to a question nobody is asking any more, and comparing revisions is
+   * how that is detected without depending on timing.
+   */
+  private readonly revision = signal(0);
 
   readonly authoredTopology = this.topology.asReadonly();
 
@@ -52,6 +63,17 @@ export class WorkspaceStore {
     const name = selected?.ownerService ?? (selected?.kind === 'service' ? selected.name : null);
 
     return this.topology().services.find((service) => service.name === name) ?? null;
+  });
+
+  /** True when the selected network is one the author declared, rather than one Compose supplies. */
+  readonly selectedNetworkIsDeclared = computed(() => {
+    const selected = this.selection();
+
+    return (
+      selected !== null &&
+      selected.kind === 'network' &&
+      this.topology().networks.some((network) => network.name === selected.name)
+    );
   });
 
   // --- Generated YAML, from the backend ------------------------------------
@@ -127,12 +149,17 @@ export class WorkspaceStore {
 
   private readonly projectId = signal<string | null>(null);
 
-  private readonly projectName = signal('Untitled architecture');
+  private readonly projectName = signal(INITIAL_NAME);
 
-  /** The topology as last saved, for comparison. Null when this has never been saved. */
+  /** Name and topology as last saved. Null when this has never been saved. */
   private readonly savedSnapshot = signal<string | null>(null);
 
   private readonly saving = signal(false);
+
+  private readonly projects = signal<readonly ProjectSummary[]>([]);
+
+  /** Set when a project switch is waiting on a decision about unsaved work. */
+  private readonly pendingOpen = signal<string | null>(null);
 
   readonly currentProjectId = this.projectId.asReadonly();
 
@@ -142,14 +169,26 @@ export class WorkspaceStore {
 
   readonly isSaved = computed(() => this.projectId() !== null);
 
+  readonly savedProjects = this.projects.asReadonly();
+
+  readonly pendingProjectId = this.pendingOpen.asReadonly();
+
+  readonly pendingProjectName = computed(() => {
+    const id = this.pendingOpen();
+
+    return this.projects().find((project) => project.id === id)?.name ?? null;
+  });
+
   /**
-   * Unsaved changes. Compares the serialised working topology against the last saved one — adequate
-   * because both come from the same contract, and an explicit save is the only thing that clears it.
+   * Unsaved changes covers the name as well as the architecture: renaming a saved project is a change
+   * to the project, and an explicit save is the only thing that clears it.
    */
   readonly hasUnsavedChanges = computed(() => {
     const snapshot = this.savedSnapshot();
 
-    return snapshot === null ? this.hasContent() : JSON.stringify(this.topology()) !== snapshot;
+    return snapshot === null
+      ? this.hasContent() || this.projectName() !== INITIAL_NAME
+      : this.snapshotOf(this.projectName(), this.topology()) !== snapshot;
   });
 
   constructor() {
@@ -323,13 +362,20 @@ export class WorkspaceStore {
 
   /** Explicit. Nothing in this store runs a simulation on its own. */
   simulate(): void {
+    const requestedFor = this.revision();
+
     this.simulationRunning.set(true);
 
     this.api
       .simulate(this.topology())
       .pipe(finalize(() => this.simulationRunning.set(false)))
       .subscribe({
-        next: (result) => this.simulationResult.set(result),
+        next: (result) => {
+          // Discard an answer about an architecture that has since changed.
+          if (this.revision() === requestedFor) {
+            this.simulationResult.set(result);
+          }
+        },
         error: () => {
           // Reported by errorInterceptor.
         },
@@ -338,20 +384,41 @@ export class WorkspaceStore {
 
   // --- Projects -------------------------------------------------------------
 
-  loadProject(id: string): void {
-    this.api.getProject(id).subscribe({
-      next: (project) => {
-        this.projectId.set(project.id);
-        this.projectName.set(project.name);
-        this.replace(project.topology);
-        this.savedSnapshot.set(JSON.stringify(project.topology));
-        this.draft.set(null);
-        this.selection.set(null);
-      },
+  refreshProjects(): void {
+    this.api.listProjects().subscribe({
+      next: (result) => this.projects.set(result.projects),
       error: () => {
-        // Reported by errorInterceptor. A 409 means the saved schema is one this build cannot read.
+        // Reported by errorInterceptor.
       },
     });
+  }
+
+  /**
+   * Asks to open a project. With unsaved work this waits for a decision instead of replacing it:
+   * ComposeLab saves only when told to, so a silent switch would discard the learner's work.
+   */
+  requestOpenProject(id: string): void {
+    if (this.hasUnsavedChanges()) {
+      this.pendingOpen.set(id);
+
+      return;
+    }
+
+    this.loadProject(id);
+  }
+
+  discardChangesAndOpenPending(): void {
+    const id = this.pendingOpen();
+
+    this.pendingOpen.set(null);
+
+    if (id !== null) {
+      this.loadProject(id);
+    }
+  }
+
+  cancelPendingOpen(): void {
+    this.pendingOpen.set(null);
   }
 
   rename(name: string): void {
@@ -372,7 +439,7 @@ export class WorkspaceStore {
         .subscribe({
           next: (created) => {
             this.projectId.set(created);
-            this.savedSnapshot.set(JSON.stringify(request.topology));
+            this.markSaved(request.name, request.topology);
           },
           error: () => {
             // Reported by errorInterceptor.
@@ -386,19 +453,47 @@ export class WorkspaceStore {
       .updateProject(id, request)
       .pipe(finalize(() => this.saving.set(false)))
       .subscribe({
-        next: () => this.savedSnapshot.set(JSON.stringify(request.topology)),
+        next: () => this.markSaved(request.name, request.topology),
         error: () => {
           // Reported by errorInterceptor.
         },
       });
   }
 
+  private loadProject(id: string): void {
+    this.api.getProject(id).subscribe({
+      next: (project) => {
+        this.projectId.set(project.id);
+        this.projectName.set(project.name);
+        this.replace(project.topology);
+        this.savedSnapshot.set(this.snapshotOf(project.name, project.topology));
+        this.draft.set(null);
+        this.selection.set(null);
+      },
+      error: () => {
+        // Reported by errorInterceptor. A 409 means the saved schema is one this build cannot read.
+      },
+    });
+  }
+
+  /** Summaries refresh because a save succeeded, not because time passed. */
+  private markSaved(name: string, topology: TopologyDocument): void {
+    this.savedSnapshot.set(this.snapshotOf(name, topology));
+    this.refreshProjects();
+  }
+
+  private snapshotOf(name: string, topology: TopologyDocument): string {
+    return JSON.stringify({ name, topology });
+  }
+
   /**
-   * Replaces the working topology. Any simulation result is dropped: a timeline describes the
-   * architecture it was run against, and showing it beside a changed one would be a lie.
+   * Replaces the working topology. Any simulation result is dropped and the revision moves on: a
+   * timeline describes the architecture it was run against, and an in-flight request for the previous
+   * one must not be allowed to land.
    */
   private replace(next: TopologyDocument): void {
     this.topology.set(next);
+    this.revision.update((current) => current + 1);
     this.simulationResult.set(null);
   }
 }

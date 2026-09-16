@@ -36,6 +36,22 @@
   stroke-dasharray: 3 3;
 }
 
+/* Implied attachments read as fainter and dashed, so Compose's contribution is visible without
+   competing with what the author wrote. */
+.connectors__line--implied {
+  stroke: var(--text-faint);
+  stroke-dasharray: 2 4;
+}
+
+.band--implied {
+  border-style: dashed;
+  border-color: var(--text-faint);
+}
+
+.band--implied .band__name {
+  color: var(--text-muted);
+}
+
 .node {
   position: absolute;
   border: 1px solid var(--border);

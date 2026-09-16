@@ -188,6 +188,14 @@
       <span class="identifier">{{ element.name }}</span>
     </p>
     <p class="hint">{{ element.kind === 'volume' ? 'Named volume' : 'Network' }}</p>
+
+    <!-- Compose supplies this one; there is no declaration to edit or remove. -->
+    @if (element.kind === 'network' && !networkIsDeclared()) {
+      <p class="hint">
+        Supplied by Compose. Services that name no network of their own join it, which is why they
+        can reach each other with nothing written down. Declare a network to take control of it.
+      </p>
+    }
   </div>
 
   <div class="section">
@@ -206,10 +214,12 @@
     }
   </div>
 
-  <button type="button" class="danger" (click)="removeSelectedResource()">
-    <app-icon name="remove" />
-    <span>Remove {{ element.name }}</span>
-  </button>
+  @if (element.kind === 'volume' || networkIsDeclared()) {
+    <button type="button" class="danger" (click)="removeSelectedResource()">
+      <app-icon name="remove" />
+      <span>Remove {{ element.name }}</span>
+    </button>
+  }
 } @else {
   <p class="hint">Select a service, network, or volume to inspect and edit it.</p>
 }

@@ -20,6 +20,7 @@
           [attr.x2]="connector.x"
           [attr.y2]="connector.y2"
           [class.connectors__line--volume]="connector.kind === 'volume'"
+          [class.connectors__line--implied]="connector.implied"
           class="connectors__line"
         />
       }
@@ -76,6 +77,7 @@
         type="button"
         class="node band"
         [class.band--volume]="band.kind === 'volume'"
+        [class.band--implied]="band.origin === 'implied'"
         [class.node--selected]="isSelected(band.kind, band.name)"
         [attr.aria-pressed]="isSelected(band.kind, band.name)"
         [style.top.px]="band.y"
@@ -85,7 +87,14 @@
       >
         <app-icon [name]="band.kind === 'volume' ? 'volume' : 'network'" />
         <span class="band__name">{{ band.name }}</span>
-        <span class="band__kind">{{ band.kind === 'volume' ? 'named volume' : 'network' }}</span>
+        <!-- Marked in words, not only by the dashed border. -->
+        <span class="band__kind">
+          @if (band.origin === 'implied') {
+            <span>supplied by Compose</span>
+          } @else {
+            <span>{{ band.kind === 'volume' ? 'named volume' : 'network' }}</span>
+          }
+        </span>
       </button>
     }
   </div>

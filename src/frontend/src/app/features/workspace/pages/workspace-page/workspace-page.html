@@ -21,7 +21,7 @@
 
   <label class="open">
     <span class="project__label">Open</span>
-    <select class="open__select" aria-label="Open a saved project" (change)="open($event)">
+    <select class="open__select" aria-label="Open a saved project" (change)="requestOpen($event)">
       <option value="">Saved projects…</option>
       @for (project of savedProjects(); track project.id) {
         <option [value]="project.id">{{ project.name }}</option>
@@ -43,6 +43,21 @@
     <span>{{ isSaving() ? 'Saving…' : 'Save project' }}</span>
   </button>
 </header>
+
+<!-- Explicit save means a project switch cannot quietly throw work away. -->
+@if (pendingProjectName(); as target) {
+  <div class="pending" role="alert">
+    <span class="pending__label">Unsaved changes</span>
+    <span
+      >Opening <strong>{{ target }}</strong> will discard them. ComposeLab only saves when you ask
+      it to.</span
+    >
+    <button type="button" class="pending__stay" (click)="cancelOpen()">Keep editing</button>
+    <button type="button" class="pending__discard" (click)="discardAndOpen()">
+      Discard and open
+    </button>
+  </div>
+}
 
 <div class="layout">
   <aside class="layout__palette"><app-component-palette /></aside>

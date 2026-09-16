@@ -22,6 +22,7 @@ export class ElementInspector {
   protected readonly topology = this.store.authoredTopology;
   protected readonly selected = this.store.selectedElement;
   protected readonly service = this.store.selectedService;
+  protected readonly networkIsDeclared = this.store.selectedNetworkIsDeclared;
 
   /** Which services attach to the selected network, or mount the selected volume. */
   protected readonly relatedServices = computed<readonly string[]>(() => {
