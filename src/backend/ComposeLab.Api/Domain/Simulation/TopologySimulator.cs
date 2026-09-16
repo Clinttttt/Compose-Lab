@@ -31,13 +31,9 @@ public static class TopologySimulator
                 .Where(network => network.Origin == DeclarationOrigin.Implicit)
                 .Select(network => ElementReference.Network(network.Name))]);
 
-        List<SimulationIssue> issues =
-        [
-            .. StructureRules.Evaluate(normalized),
-            .. PortRules.Evaluate(normalized)
-        ];
+        List<SimulationIssue> issues = [.. RuleCatalog.Structural(normalized)];
 
-        if (issues.Any(issue => issue.Severity == SimulationSeverity.Error))
+        if (RuleCatalog.HasError(issues))
         {
             log.Add(
                 SimulationPhase.StructuralValidation,
@@ -70,13 +66,10 @@ public static class TopologySimulator
 
         StartServices(normalized, startOrder, log);
 
-        issues.AddRange(ReadinessRules.Evaluate(normalized));
-        issues.AddRange(PersistenceRules.Evaluate(normalized));
-
         IReadOnlyList<InferredConnection> inferred = ConnectionIntentInference.Infer(normalized);
         IReadOnlyList<ReachabilityPair> reachability = ReachabilityRules.BuildMatrix(normalized);
 
-        issues.AddRange(ReachabilityRules.Evaluate(normalized, inferred));
+        issues.AddRange(RuleCatalog.Advisory(normalized, inferred));
 
         log.Add(
             SimulationPhase.Reachability,

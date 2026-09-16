@@ -18,7 +18,7 @@ public sealed record Response
 
     public IReadOnlyList<SimulationEventResponse> Events { get; init; } = [];
 
-    public IReadOnlyList<SimulationIssueResponse> Issues { get; init; } = [];
+    public IReadOnlyList<ArchitectureIssueResponse> Issues { get; init; } = [];
 
     public IReadOnlyList<ReachabilityResponse> Reachability { get; init; } = [];
 
@@ -32,20 +32,6 @@ public sealed record SimulationEventResponse(
     string Severity,
     IReadOnlyList<ElementResponse> Elements,
     string Message);
-
-/// <summary>
-/// A finding and its explanation. There is no YAML field: <see cref="Elements"/> resolves against the
-/// provenance returned by Compose generation, so the learner is shown their real configuration rather
-/// than a reconstruction of it.
-/// </summary>
-public sealed record SimulationIssueResponse(
-    string Code,
-    string Severity,
-    IReadOnlyList<ElementResponse> Elements,
-    string WhatHappened,
-    string Why,
-    string ArchitectureBehavior,
-    string SuggestedFix);
 
 public sealed record ReachabilityResponse(
     string ServiceA,

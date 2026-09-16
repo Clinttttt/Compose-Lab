@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using ComposeLab.Api.Features.Topology.Shared;
 using ComposeLab.Api.Features.Topology.Simulate;
 using ComposeLab.Api.Tests.TestSupport;
 using Microsoft.AspNetCore.Mvc;
@@ -53,7 +54,7 @@ public sealed class SimulateTests(ApiFixture fixture) : IClassFixture<ApiFixture
         body.Succeeded.ShouldBeFalse();
         body.Completed.ShouldBeTrue();
 
-        SimulationIssueResponse issue = body.Issues.Single(item => item.Code == "network.unreachable");
+        ArchitectureIssueResponse issue = body.Issues.Single(item => item.Code == "network.unreachable");
 
         issue.Severity.ShouldBe("error");
         issue.WhatHappened.ShouldNotBeNullOrWhiteSpace();

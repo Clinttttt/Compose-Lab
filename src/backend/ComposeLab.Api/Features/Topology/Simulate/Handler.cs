@@ -36,21 +36,11 @@ internal sealed class Handler : IQueryHandler<Query, Response>
                 item.Step,
                 Name(item.Phase),
                 item.Code.Value,
-                Name(item.Severity),
+                ArchitectureIssueResponse.SeverityToken(item.Severity),
                 [.. item.Elements.Select(ElementResponse.From)],
                 item.Message))
         ],
-        Issues =
-        [
-            .. result.Issues.Select(issue => new SimulationIssueResponse(
-                issue.Code.Value,
-                Name(issue.Severity),
-                [.. issue.Elements.Select(ElementResponse.From)],
-                issue.WhatHappened,
-                issue.Why,
-                issue.ArchitectureBehavior,
-                issue.SuggestedFix))
-        ],
+        Issues = [.. result.Issues.Select(ArchitectureIssueResponse.From)],
         Reachability =
         [
             .. result.Reachability.Select(pair => new ReachabilityResponse(
@@ -79,13 +69,5 @@ internal sealed class Handler : IQueryHandler<Query, Response>
         SimulationPhase.Reachability => "reachability",
         SimulationPhase.Completion => "completion",
         _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unmapped simulation phase.")
-    };
-
-    private static string Name(SimulationSeverity severity) => severity switch
-    {
-        SimulationSeverity.Information => "information",
-        SimulationSeverity.Warning => "warning",
-        SimulationSeverity.Error => "error",
-        _ => throw new ArgumentOutOfRangeException(nameof(severity), severity, "Unmapped severity.")
     };
 }
