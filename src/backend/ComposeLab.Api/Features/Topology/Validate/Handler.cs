@@ -1,6 +1,7 @@
 using ComposeLab.Api.Abstractions.Messaging;
 using ComposeLab.Api.Domain.Common;
 using ComposeLab.Api.Domain.Simulation;
+using ComposeLab.Api.Domain.Topology.Document;
 using ComposeLab.Api.Features.Topology.Shared;
 
 namespace ComposeLab.Api.Features.Topology.Validate;
@@ -18,7 +19,7 @@ internal sealed class Handler : IQueryHandler<Query, Response>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ValidationReport report = TopologyValidator.Validate(TopologyMapper.ToTopology(query));
+        ValidationReport report = TopologyValidator.Validate(TopologyDocumentMapper.ToTopology(query));
 
         return Task.FromResult(Result.Success(new Response
         {

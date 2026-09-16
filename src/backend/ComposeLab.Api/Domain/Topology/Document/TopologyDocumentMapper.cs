@@ -1,62 +1,11 @@
-using ComposeLab.Api.Domain.Topology;
+namespace ComposeLab.Api.Domain.Topology.Document;
 
-namespace ComposeLab.Api.Features.Topology.Shared;
-
-/// <summary>
-/// Maps between the wire contract and the domain model. No judgment, no defaults beyond Compose's own.
-/// </summary>
-/// <remarks>
-/// The reverse direction exists so that parsing can hand back a topology in exactly the shape the client
-/// posts. That keeps one topology contract on the wire and makes a generate-parse-generate round trip
-/// expressible end to end.
-/// </remarks>
-internal static class TopologyMapper
+/// <summary>Maps between the authored document and the domain model. No judgment, no invented defaults.</summary>
+internal static class TopologyDocumentMapper
 {
-    public static ApplicationTopology ToTopology(TopologyRequest request) => new()
-    {
-        Services = [.. request.Services.Select(ToService)],
-        Networks =
-        [
-            .. request.Networks.Select(network => new ContainerNetwork
-            {
-                Name = network.Name,
-                ComposeName = network.ComposeName
-            })
-        ],
-        Volumes =
-        [
-            .. request.Volumes.Select(volume => new ContainerVolume
-            {
-                Name = volume.Name,
-                ComposeName = volume.ComposeName
-            })
-        ]
-    };
-
-    public static TopologyRequest ToRequest(ApplicationTopology topology) => new()
-    {
-        Services = [.. topology.Services.Select(ToServiceRequest)],
-        Networks =
-        [
-            .. topology.Networks.Select(network => new NetworkRequest
-            {
-                Name = network.Name,
-                ComposeName = network.ComposeName
-            })
-        ],
-        Volumes =
-        [
-            .. topology.Volumes.Select(volume => new VolumeRequest
-            {
-                Name = volume.Name,
-                ComposeName = volume.ComposeName
-            })
-        ]
-    };
-
     /// <summary>
-    /// Token names for the healthcheck forms, shared by the mapper and the validator so the accepted set
-    /// is declared once.
+    /// Token names for the healthcheck forms, declared once so the mapper and the validator cannot disagree
+    /// about which are accepted.
     /// </summary>
     public static class HealthCheckForms
     {
@@ -79,7 +28,55 @@ internal static class TopologyMapper
             All.Contains(form?.ToLowerInvariant(), StringComparer.Ordinal);
     }
 
-    private static ContainerService ToService(ServiceRequest service) => new()
+    public static ApplicationTopology ToTopology(TopologyDocument document) => new()
+    {
+        Services = [.. document.Services.Select(ToService)],
+        Networks =
+        [
+            .. document.Networks.Select(network => new ContainerNetwork
+            {
+                Name = network.Name,
+                ComposeName = network.ComposeName
+            })
+        ],
+        Volumes =
+        [
+            .. document.Volumes.Select(volume => new ContainerVolume
+            {
+                Name = volume.Name,
+                ComposeName = volume.ComposeName
+            })
+        ]
+    };
+
+    /// <summary>
+    /// Captures the authored architecture. Implicit elements are skipped: a normalized topology handed to
+    /// this method must not come back out as though the author had written Compose's implied network down.
+    /// </summary>
+    public static TopologyDocument ToDocument(ApplicationTopology topology) => new()
+    {
+        Services = [.. topology.Services.Select(ToServiceDocument)],
+        Networks =
+        [
+            .. topology.Networks
+                .Where(network => network.Origin == DeclarationOrigin.Explicit)
+                .Select(network => new NetworkDocument
+                {
+                    Name = network.Name,
+                    ComposeName = network.ComposeName
+                })
+        ],
+        Volumes =
+        [
+            .. topology.Volumes.Select(volume => new VolumeDocument
+            {
+                Name = volume.Name,
+                ComposeName = volume.ComposeName
+            })
+        ]
+    };
+
+    private static ContainerService ToService(ServiceDocument service) => new()
     {
         Name = service.Name,
         Image = service.Image,
@@ -106,24 +103,29 @@ internal static class TopologyMapper
         HealthCheck = ToHealthCheck(service.HealthCheck)
     };
 
-    private static ServiceRequest ToServiceRequest(ContainerService service) => new()
+    private static ServiceDocument ToServiceDocument(ContainerService service) => new()
     {
         Name = service.Name,
         Image = service.Image,
         Build = service.BuildContext,
         Ports =
         [
-            .. service.Ports.Select(port => new PortRequest
+            .. service.Ports.Select(port => new PortDocument
             {
                 HostPort = port.HostPort,
                 ContainerPort = port.ContainerPort,
                 Protocol = port.ProtocolToken
             })
         ],
-        Networks = [.. service.Networks.Select(attachment => attachment.NetworkName)],
+        Networks =
+        [
+            .. service.Networks
+                .Where(attachment => attachment.Origin == DeclarationOrigin.Explicit)
+                .Select(attachment => attachment.NetworkName)
+        ],
         Volumes =
         [
-            .. service.Volumes.Select(mount => new VolumeMountRequest
+            .. service.Volumes.Select(mount => new VolumeMountDocument
             {
                 Volume = mount.VolumeName,
                 Path = mount.ContainerPath
@@ -131,14 +133,14 @@ internal static class TopologyMapper
         ],
         DependsOn =
         [
-            .. service.Dependencies.Select(dependency => new DependencyRequest
+            .. service.Dependencies.Select(dependency => new DependencyDocument
             {
                 Service = dependency.ServiceName,
                 Condition = ToConditionToken(dependency.Condition)
             })
         ],
         Environment = new Dictionary<string, string>(service.Environment, StringComparer.Ordinal),
-        HealthCheck = ToHealthCheckRequest(service.HealthCheck)
+        HealthCheck = ToHealthCheckDocument(service.HealthCheck)
     };
 
     private static PortProtocol ToProtocol(string? protocol) =>
@@ -154,7 +156,7 @@ internal static class TopologyMapper
     private static string ToConditionToken(DependencyCondition condition) =>
         condition == DependencyCondition.ServiceHealthy ? "service_healthy" : "service_started";
 
-    private static HealthCheckDeclaration? ToHealthCheck(HealthCheckRequest? healthCheck)
+    private static HealthCheckDeclaration? ToHealthCheck(HealthCheckDocument? healthCheck)
     {
         if (healthCheck is null)
         {
@@ -170,14 +172,14 @@ internal static class TopologyMapper
         };
     }
 
-    private static HealthCheckRequest? ToHealthCheckRequest(HealthCheckDeclaration? healthCheck)
+    private static HealthCheckDocument? ToHealthCheckDocument(HealthCheckDeclaration? healthCheck)
     {
         if (healthCheck is null)
         {
             return null;
         }
 
-        return new HealthCheckRequest
+        return new HealthCheckDocument
         {
             Form = healthCheck.Form switch
             {

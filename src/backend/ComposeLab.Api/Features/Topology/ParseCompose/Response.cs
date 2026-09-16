@@ -1,4 +1,4 @@
-using ComposeLab.Api.Features.Topology.Shared;
+using ComposeLab.Api.Domain.Topology.Document;
 
 namespace ComposeLab.Api.Features.Topology.ParseCompose;
 
@@ -18,7 +18,7 @@ public sealed record Response
     /// </summary>
     public required bool CanApply { get; init; }
 
-    public TopologyRequest? Topology { get; init; }
+    public TopologyDocument? Topology { get; init; }
 
     public IReadOnlyList<ComposeFindingResponse> Findings { get; init; } = [];
 }

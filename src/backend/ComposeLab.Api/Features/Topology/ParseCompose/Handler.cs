@@ -1,7 +1,7 @@
 using ComposeLab.Api.Abstractions.Messaging;
 using ComposeLab.Api.Domain.Common;
 using ComposeLab.Api.Domain.Compose;
-using ComposeLab.Api.Features.Topology.Shared;
+using ComposeLab.Api.Domain.Topology.Document;
 
 namespace ComposeLab.Api.Features.Topology.ParseCompose;
 
@@ -24,7 +24,7 @@ internal sealed class Handler : IQueryHandler<Query, Response>
         return Task.FromResult(Result.Success(new Response
         {
             CanApply = result.CanApply,
-            Topology = result.Topology is null ? null : TopologyMapper.ToRequest(result.Topology),
+            Topology = result.Topology is null ? null : TopologyDocumentMapper.ToDocument(result.Topology),
             Findings =
             [
                 .. result.Findings.Select(finding => new ComposeFindingResponse(

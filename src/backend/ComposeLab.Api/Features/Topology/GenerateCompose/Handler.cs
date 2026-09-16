@@ -1,6 +1,7 @@
 using ComposeLab.Api.Abstractions.Messaging;
 using ComposeLab.Api.Domain.Common;
 using ComposeLab.Api.Domain.Compose;
+using ComposeLab.Api.Domain.Topology.Document;
 using ComposeLab.Api.Features.Topology.Shared;
 
 namespace ComposeLab.Api.Features.Topology.GenerateCompose;
@@ -15,7 +16,7 @@ internal sealed class Handler : IQueryHandler<Query, Response>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ComposeDocument document = ComposeGenerator.Generate(TopologyMapper.ToTopology(query));
+        ComposeDocument document = ComposeGenerator.Generate(TopologyDocumentMapper.ToTopology(query));
 
         return Task.FromResult(Result.Success(new Response
         {

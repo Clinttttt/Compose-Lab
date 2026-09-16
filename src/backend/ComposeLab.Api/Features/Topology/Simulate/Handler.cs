@@ -1,6 +1,7 @@
 using ComposeLab.Api.Abstractions.Messaging;
 using ComposeLab.Api.Domain.Common;
 using ComposeLab.Api.Domain.Simulation;
+using ComposeLab.Api.Domain.Topology.Document;
 using ComposeLab.Api.Features.Topology.Shared;
 
 namespace ComposeLab.Api.Features.Topology.Simulate;
@@ -20,7 +21,7 @@ internal sealed class Handler : IQueryHandler<Query, Response>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        SimulationResult result = TopologySimulator.Simulate(TopologyMapper.ToTopology(query));
+        SimulationResult result = TopologySimulator.Simulate(TopologyDocumentMapper.ToTopology(query));
 
         return Task.FromResult(Result.Success(ToResponse(result)));
     }

@@ -1,4 +1,4 @@
-using ComposeLab.Api.Features.Topology.Shared;
+using ComposeLab.Api.Domain.Topology.Document;
 using ComposeLab.Api.Features.Topology.Simulate;
 using FluentValidation.TestHelper;
 
@@ -50,9 +50,9 @@ public sealed class SimulateValidatorTests
     [InlineData(65536)]
     public void ContainerPortMustBeInRange(int containerPort)
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Ports = [new PortRequest { ContainerPort = containerPort }]
+            Ports = [new PortDocument { ContainerPort = containerPort }]
         };
 
         _validator.TestValidate(Query([service]))
@@ -62,9 +62,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void HostPortMustBeInRangeWhenSupplied()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Ports = [new PortRequest { HostPort = 0, ContainerPort = 8080 }]
+            Ports = [new PortDocument { HostPort = 0, ContainerPort = 8080 }]
         };
 
         _validator.TestValidate(Query([service]))
@@ -74,9 +74,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void AnOmittedHostPortIsValid()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Ports = [new PortRequest { ContainerPort = 8080 }]
+            Ports = [new PortDocument { ContainerPort = 8080 }]
         };
 
         _validator.TestValidate(Query([service])).ShouldNotHaveAnyValidationErrors();
@@ -85,9 +85,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void ProtocolMustBeTcpOrUdp()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Ports = [new PortRequest { ContainerPort = 8080, Protocol = "sctp" }]
+            Ports = [new PortDocument { ContainerPort = 8080, Protocol = "sctp" }]
         };
 
         _validator.TestValidate(Query([service]))
@@ -100,9 +100,9 @@ public sealed class SimulateValidatorTests
     [InlineData("TCP")]
     public void RecognizedProtocolsAreAccepted(string protocol)
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Ports = [new PortRequest { ContainerPort = 8080, Protocol = protocol }]
+            Ports = [new PortDocument { ContainerPort = 8080, Protocol = protocol }]
         };
 
         _validator.TestValidate(Query([service])).ShouldNotHaveAnyValidationErrors();
@@ -111,9 +111,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void AMountPathMustBeAbsolute()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            Volumes = [new VolumeMountRequest { Volume = "data", Path = "var/lib/data" }]
+            Volumes = [new VolumeMountDocument { Volume = "data", Path = "var/lib/data" }]
         };
 
         _validator.TestValidate(Query([service]))
@@ -123,9 +123,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void ADependencyConditionMustBeRecognized()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            DependsOn = [new DependencyRequest { Service = "db", Condition = "service_completed" }]
+            DependsOn = [new DependencyDocument { Service = "db", Condition = "service_completed" }]
         };
 
         _validator.TestValidate(Query([service]))
@@ -135,9 +135,9 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void AnOmittedConditionIsValid()
     {
-        ServiceRequest service = Service("api", image: "api:1") with
+        ServiceDocument service = Service("api", image: "api:1") with
         {
-            DependsOn = [new DependencyRequest { Service = "db" }]
+            DependsOn = [new DependencyDocument { Service = "db" }]
         };
 
         _validator.TestValidate(Query([service])).ShouldNotHaveAnyValidationErrors();
@@ -146,7 +146,7 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void TooManyServicesIsRejected()
     {
-        ServiceRequest[] services = [.. Enumerable.Range(0, 51).Select(index => Service($"s{index}", "api:1"))];
+        ServiceDocument[] services = [.. Enumerable.Range(0, 51).Select(index => Service($"s{index}", "api:1"))];
 
         _validator.TestValidate(new Query { Services = services })
             .ShouldHaveValidationErrorFor(query => query.Services);
@@ -171,14 +171,14 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void CollidingHostPortsAreAValidRequest()
     {
-        ServiceRequest first = Service("api", "api:1") with
+        ServiceDocument first = Service("api", "api:1") with
         {
-            Ports = [new PortRequest { HostPort = 8080, ContainerPort = 8080 }]
+            Ports = [new PortDocument { HostPort = 8080, ContainerPort = 8080 }]
         };
 
-        ServiceRequest second = Service("web", "web:1") with
+        ServiceDocument second = Service("web", "web:1") with
         {
-            Ports = [new PortRequest { HostPort = 8080, ContainerPort = 80 }]
+            Ports = [new PortDocument { HostPort = 8080, ContainerPort = 80 }]
         };
 
         _validator.TestValidate(Query([first, second])).ShouldNotHaveAnyValidationErrors();
@@ -187,12 +187,12 @@ public sealed class SimulateValidatorTests
     [Fact]
     public void ADependencyOnAMissingServiceIsAValidRequest() =>
         _validator.TestValidate(Query(
-            [Service("api", "api:1") with { DependsOn = [new DependencyRequest { Service = "nope" }] }]))
+            [Service("api", "api:1") with { DependsOn = [new DependencyDocument { Service = "nope" }] }]))
             .ShouldNotHaveAnyValidationErrors();
 
-    private static Query Query(IReadOnlyList<ServiceRequest> services) => new() { Services = services };
+    private static Query Query(IReadOnlyList<ServiceDocument> services) => new() { Services = services };
 
-    private static ServiceRequest Service(string name, string? image = null) => new()
+    private static ServiceDocument Service(string name, string? image = null) => new()
     {
         Name = name,
         Image = image
