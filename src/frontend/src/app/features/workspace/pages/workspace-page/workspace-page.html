@@ -38,6 +38,29 @@
     </span>
   }
 
+  <div class="history">
+    <button
+      type="button"
+      class="history__button"
+      [disabled]="!canUndo()"
+      title="Undo (Ctrl+Z)"
+      (click)="undo()"
+    >
+      <app-icon name="undo" />
+      <span>Undo</span>
+    </button>
+    <button
+      type="button"
+      class="history__button"
+      [disabled]="!canRedo()"
+      title="Redo (Ctrl+Shift+Z)"
+      (click)="redo()"
+    >
+      <app-icon name="redo" />
+      <span>Redo</span>
+    </button>
+  </div>
+
   <button type="button" class="save" [disabled]="isSaving()" (click)="save()">
     <app-icon name="save" />
     <span>{{ isSaving() ? 'Saving…' : 'Save project' }}</span>

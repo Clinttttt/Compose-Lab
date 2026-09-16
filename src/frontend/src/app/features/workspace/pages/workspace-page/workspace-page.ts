@@ -20,6 +20,7 @@ import { YamlPane } from '../../ui/yaml-pane/yaml-pane';
   templateUrl: './workspace-page.html',
   styleUrl: './workspace-page.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(document:keydown)': 'onKeydown($event)' },
 })
 export class WorkspacePage implements OnInit {
   private readonly store = inject(WorkspaceStore);
@@ -31,6 +32,8 @@ export class WorkspacePage implements OnInit {
   protected readonly validation = this.store.validation;
   protected readonly savedProjects = this.store.savedProjects;
   protected readonly pendingProjectName = this.store.pendingProjectName;
+  protected readonly canUndo = this.store.canUndo;
+  protected readonly canRedo = this.store.canRedo;
 
   ngOnInit(): void {
     this.store.refreshProjects();
@@ -43,6 +46,14 @@ export class WorkspacePage implements OnInit {
   /** The only thing that writes to storage. */
   protected save(): void {
     this.store.save();
+  }
+
+  protected undo(): void {
+    this.store.undo();
+  }
+
+  protected redo(): void {
+    this.store.redo();
   }
 
   /** Asks to open. With unsaved work the store waits for a decision rather than replacing it. */
@@ -65,4 +76,41 @@ export class WorkspacePage implements OnInit {
   protected cancelOpen(): void {
     this.store.cancelPendingOpen();
   }
+
+  /**
+   * Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z step through topology history.
+   *
+   * Text fields are left alone on purpose: inside the YAML draft or an inspector input the browser's
+   * own undo is what the learner expects, and taking it over would make editing text worse in exchange
+   * for a shortcut they can reach anywhere else.
+   */
+  protected onKeydown(event: KeyboardEvent): void {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') {
+      return;
+    }
+
+    if (isTextEntry(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.shiftKey) {
+      this.store.redo();
+    } else {
+      this.store.undo();
+    }
+  }
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLInputElement ||
+    target.isContentEditable
+  );
 }

@@ -105,6 +105,71 @@ describe('WorkspaceStore', () => {
       expect(store.isEditingYaml()).toBe(false);
       expect(store.parseFindings()).toHaveLength(0);
     });
+
+    /**
+     * The race: Apply is clicked, the learner keeps typing, and the answer about the older YAML comes
+     * back. It must not replace the topology, and it must not close the newer draft.
+     */
+    it('ignores a parse response for a draft the learner has moved past', () => {
+      store.addService(service('api'));
+
+      // 1. Draft A
+      store.beginYamlDraft();
+      store.updateYamlDraft('services:\n  cache:\n    image: redis:8\n');
+
+      // 2. Apply A, leaving the request in flight
+      store.applyYamlDraft();
+      const inFlight = backend.expectOne('/api/compose/parse');
+
+      // 3. Edit to Draft B
+      store.updateYamlDraft('services:\n  queue:\n    image: rabbitmq:4\n');
+
+      // 4. A successful parse for A returns
+      inFlight.flush({
+        canApply: true,
+        topology: { services: [service('cache')], networks: [], volumes: [] },
+        findings: [
+          {
+            code: 'compose.key_not_modeled',
+            path: 'services.cache.restart',
+            line: 4,
+            column: 5,
+            message: 'stale finding',
+            suggestion: 'stale suggestion',
+          },
+        ],
+      } satisfies ParseComposeResponse);
+
+      // 5. The topology is unchanged.
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api']);
+
+      // 6. Draft B is still open, and still says what the learner typed.
+      expect(store.isEditingYaml()).toBe(true);
+      expect(store.yamlDraft()).toBe('services:\n  queue:\n    image: rabbitmq:4\n');
+
+      // 7. Nothing from the stale response is shown.
+      expect(store.parseFindings()).toHaveLength(0);
+    });
+
+    it('applies the newer draft when it is submitted in turn', () => {
+      store.beginYamlDraft();
+      store.updateYamlDraft('draft a');
+      store.applyYamlDraft();
+
+      const stale = backend.expectOne('/api/compose/parse');
+
+      store.updateYamlDraft('draft b');
+      store.applyYamlDraft();
+
+      const current = backend.expectOne('/api/compose/parse');
+
+      // The obsolete answer lands first and is ignored; the current one is honoured.
+      stale.flush({ canApply: true, topology: topologyOf('cache'), findings: [] });
+      current.flush({ canApply: true, topology: topologyOf('queue'), findings: [] });
+
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['queue']);
+      expect(store.isEditingYaml()).toBe(false);
+    });
   });
 
   describe('correspondence', () => {
@@ -334,6 +399,184 @@ describe('WorkspaceStore', () => {
 
       expect(store.pendingProjectId()).toBeNull();
       expect(backend.expectOne('/api/projects/abc').request.method).toBe('GET');
+    });
+  });
+
+  describe('history', () => {
+    it('steps back and forward through topology changes', () => {
+      store.addService(service('api'));
+      store.addService(service('cache'));
+
+      expect(store.canUndo()).toBe(true);
+
+      store.undo();
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api']);
+
+      store.undo();
+      expect(store.authoredTopology().services).toHaveLength(0);
+      expect(store.canUndo()).toBe(false);
+
+      store.redo();
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api']);
+
+      store.redo();
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api', 'cache']);
+      expect(store.canRedo()).toBe(false);
+    });
+
+    it('makes a new change discard the redone future', () => {
+      store.addService(service('api'));
+      store.undo();
+
+      expect(store.canRedo()).toBe(true);
+
+      store.addService(service('queue'));
+
+      expect(store.canRedo()).toBe(false);
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['queue']);
+    });
+
+    /** Undo goes through the same replacement path, so it invalidates a simulation like any edit. */
+    it('invalidates a simulation, including one still in flight', () => {
+      store.addService(service('api'));
+
+      store.simulate();
+      backend.expectOne('/api/topology/simulate').flush(simulationResult(['api']));
+      expect(store.simulation()).not.toBeNull();
+
+      store.undo();
+      expect(store.simulation()).toBeNull();
+
+      store.simulate();
+      const inFlight = backend.expectOne('/api/topology/simulate');
+
+      store.redo();
+      inFlight.flush(simulationResult(['api']));
+
+      expect(store.simulation()).toBeNull();
+    });
+
+    it('records a successful Apply YAML as one entry', () => {
+      store.addService(service('api'));
+
+      store.beginYamlDraft();
+      store.updateYamlDraft('services:\n  cache:\n    image: redis:8\n');
+      store.applyYamlDraft();
+
+      backend.expectOne('/api/compose/parse').flush({
+        canApply: true,
+        topology: topologyOf('cache'),
+        findings: [],
+      });
+
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['cache']);
+
+      store.undo();
+
+      expect(store.authoredTopology().services.map((item) => item.name)).toEqual(['api']);
+    });
+
+    it('records nothing for a blocked Apply YAML', () => {
+      store.addService(service('api'));
+
+      const before = store.canUndo();
+
+      store.beginYamlDraft();
+      store.updateYamlDraft('services:\n  api:\n    restart: always\n');
+      store.applyYamlDraft();
+
+      backend.expectOne('/api/compose/parse').flush({
+        canApply: false,
+        topology: null,
+        findings: [
+          {
+            code: 'compose.key_not_modeled',
+            path: 'services.api.restart',
+            line: 3,
+            column: 5,
+            message: 'not modeled',
+            suggestion: 'remove it',
+          },
+        ],
+      });
+
+      store.discardYamlDraft();
+
+      // Nothing changed, so there is nothing extra to undo.
+      expect(store.canUndo()).toBe(before);
+      store.undo();
+      expect(store.authoredTopology().services).toHaveLength(0);
+    });
+
+    /** Undo moves the topology, which regenerates the YAML underneath an edit in progress. */
+    it('is unavailable while a draft diverges from the generated document', () => {
+      store.addService(service('api'));
+
+      store.beginYamlDraft();
+      store.updateYamlDraft('half-typed');
+
+      expect(store.canUndo()).toBe(false);
+      expect(store.canRedo()).toBe(false);
+
+      store.undo();
+      expect(store.authoredTopology().services).toHaveLength(1);
+
+      store.discardYamlDraft();
+      expect(store.canUndo()).toBe(true);
+    });
+
+    it('never lets undo cross a project boundary', () => {
+      store.addService(service('api'));
+      store.addService(service('cache'));
+
+      store.requestOpenProject('abc');
+      store.discardChangesAndOpenPending();
+
+      backend.expectOne('/api/projects/abc').flush({
+        id: 'abc',
+        name: 'Other lab',
+        topology: topologyOf('queue'),
+        topologySchemaVersion: 1,
+        createdAt: '2026-01-01T00:00:00+00:00',
+        updatedAt: '2026-01-01T00:00:00+00:00',
+      });
+
+      expect(store.canUndo()).toBe(false);
+      expect(store.canRedo()).toBe(false);
+    });
+
+    it('keeps history across a save', () => {
+      store.addService(service('api'));
+      store.save();
+
+      backend.expectOne('/api/projects').flush('33333333-3333-3333-3333-333333333333');
+      backend.expectOne('/api/projects').flush({ projects: [] });
+
+      expect(store.canUndo()).toBe(true);
+
+      store.undo();
+
+      expect(store.authoredTopology().services).toHaveLength(0);
+      // Undoing past a save is a real change again.
+      expect(store.hasUnsavedChanges()).toBe(true);
+    });
+
+    it('caps the history rather than growing without bound', () => {
+      for (let index = 0; index < 60; index += 1) {
+        store.addService(service(`service-${index}`));
+      }
+
+      let undone = 0;
+
+      while (store.canUndo() && undone < 100) {
+        store.undo();
+        undone += 1;
+      }
+
+      expect(undone).toBe(50);
+
+      // The oldest snapshots were dropped, so the earliest reachable state is not the empty one.
+      expect(store.authoredTopology().services.length).toBeGreaterThan(0);
     });
   });
 });

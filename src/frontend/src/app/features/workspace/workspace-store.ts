@@ -20,6 +20,15 @@ import {
 const INITIAL_NAME = 'Untitled architecture';
 
 /**
+ * How many topology snapshots to keep.
+ *
+ * A cap rather than command objects or diffs: a topology is a small document, and storing whole
+ * snapshots keeps undo a plain assignment through the normal replacement path instead of a second way
+ * to mutate state that could drift from the first.
+ */
+const HISTORY_LIMIT = 50;
+
+/**
  * The workspace's single working source of truth.
  *
  * One writable topology. The diagram, inspector, generated YAML, validation state, and the input to
@@ -45,6 +54,28 @@ export class WorkspaceStore {
   private readonly revision = signal(0);
 
   readonly authoredTopology = this.topology.asReadonly();
+
+  // --- History --------------------------------------------------------------
+
+  /**
+   * Authored topology snapshots, and nothing else.
+   *
+   * Selection, the YAML draft, generated YAML, validation, simulation, and project metadata are not
+   * history: undoing should take back a change to the architecture, not restore which node happened to
+   * be selected at the time.
+   */
+  private readonly undoStack = signal<readonly TopologyDocument[]>([]);
+
+  private readonly redoStack = signal<readonly TopologyDocument[]>([]);
+
+  /**
+   * Disabled while a draft diverges from the generated document. Undo moves the topology, which
+   * regenerates the YAML underneath an edit in progress — so it waits until the draft is applied or
+   * discarded.
+   */
+  readonly canUndo = computed(() => this.undoStack().length > 0 && !this.hasUnappliedYamlEdits());
+
+  readonly canRedo = computed(() => this.redoStack().length > 0 && !this.hasUnappliedYamlEdits());
 
   readonly hasContent = computed(() => {
     const current = this.topology();
@@ -90,6 +121,16 @@ export class WorkspaceStore {
 
   /** Null means the pane is showing generated YAML rather than an edit in progress. */
   private readonly draft = signal<string | null>(null);
+
+  /**
+   * Incremented on every change to the draft, including opening and discarding one.
+   *
+   * Apply captures this and refuses a response that comes back against a draft the learner has since
+   * changed. A revision rather than a text comparison, because it also catches discarding a draft and
+   * reopening one that happens to read the same: that is a different draft, and an answer about the
+   * first one has no business closing it.
+   */
+  private readonly draftRevision = signal(0);
 
   readonly yamlDraft = this.draft.asReadonly();
 
@@ -319,21 +360,28 @@ export class WorkspaceStore {
   beginYamlDraft(): void {
     this.draft.set(this.generatedYaml());
     this.composeFindings.set([]);
+    this.draftRevision.update((current) => current + 1);
   }
 
   updateYamlDraft(yaml: string): void {
     this.draft.set(yaml);
+    this.draftRevision.update((current) => current + 1);
   }
 
   discardYamlDraft(): void {
     this.draft.set(null);
     this.composeFindings.set([]);
+    this.draftRevision.update((current) => current + 1);
   }
 
   /**
    * All or nothing. Any key the backend reports as unmodeled or unknown blocks the apply, and the
    * working topology is left exactly as it was — a partial apply would leave the learner with an
    * architecture that quietly disagrees with the file they wrote.
+   *
+   * The answer is also checked against the draft it was asked about. Typing while the request is in
+   * flight would otherwise let a result for the older YAML replace the topology and close the newer
+   * draft.
    */
   applyYamlDraft(): void {
     const draft = this.draft();
@@ -342,13 +390,22 @@ export class WorkspaceStore {
       return;
     }
 
+    const submittedFor = this.draftRevision();
+
     this.api.parse(draft).subscribe({
       next: (result) => {
+        if (this.draftRevision() !== submittedFor) {
+          // An answer about YAML the learner has already moved past. Neither its findings nor its
+          // topology may touch current state.
+          return;
+        }
+
         this.composeFindings.set(result.findings);
 
         if (result.canApply && result.topology !== null) {
           this.replace(result.topology);
           this.draft.set(null);
+          this.draftRevision.update((current) => current + 1);
           this.selection.set(null);
         }
       },
@@ -356,6 +413,37 @@ export class WorkspaceStore {
         // Reported by errorInterceptor. The topology stays untouched either way.
       },
     });
+  }
+
+  // --- History --------------------------------------------------------------
+
+  /** Steps back one topology change. Goes through the same replacement path as any other edit. */
+  undo(): void {
+    if (!this.canUndo()) {
+      return;
+    }
+
+    const stack = this.undoStack();
+    const previous = stack[stack.length - 1];
+
+    this.undoStack.set(stack.slice(0, -1));
+    this.redoStack.update((stack) => trim([...stack, this.topology()]));
+
+    this.replace(previous, false);
+  }
+
+  redo(): void {
+    if (!this.canRedo()) {
+      return;
+    }
+
+    const stack = this.redoStack();
+    const next = stack[stack.length - 1];
+
+    this.redoStack.set(stack.slice(0, -1));
+    this.undoStack.update((stack) => trim([...stack, this.topology()]));
+
+    this.replace(next, false);
   }
 
   // --- Simulation -----------------------------------------------------------
@@ -468,7 +556,13 @@ export class WorkspaceStore {
         this.replace(project.topology);
         this.savedSnapshot.set(this.snapshotOf(project.name, project.topology));
         this.draft.set(null);
+        this.draftRevision.update((current) => current + 1);
         this.selection.set(null);
+
+        // History cannot cross a project boundary: undoing into another architecture would be
+        // meaningless, and saving afterwards would write it.
+        this.undoStack.set([]);
+        this.redoStack.set([]);
       },
       error: () => {
         // Reported by errorInterceptor. A 409 means the saved schema is one this build cannot read.
@@ -490,10 +584,26 @@ export class WorkspaceStore {
    * Replaces the working topology. Any simulation result is dropped and the revision moves on: a
    * timeline describes the architecture it was run against, and an in-flight request for the previous
    * one must not be allowed to land.
+   *
+   * Undo and redo come through here too, with <paramref name="recordHistory"/> false — one path that
+   * changes the topology, so nothing can move it without advancing the revision.
    */
-  private replace(next: TopologyDocument): void {
+  private replace(next: TopologyDocument, recordHistory = true): void {
+    if (recordHistory) {
+      this.undoStack.update((stack) => trim([...stack, this.topology()]));
+
+      // A new change makes the redone future unreachable.
+      this.redoStack.set([]);
+    }
+
     this.topology.set(next);
     this.revision.update((current) => current + 1);
     this.simulationResult.set(null);
   }
+}
+
+function trim(snapshots: readonly TopologyDocument[]): readonly TopologyDocument[] {
+  return snapshots.length > HISTORY_LIMIT
+    ? snapshots.slice(snapshots.length - HISTORY_LIMIT)
+    : snapshots;
 }
